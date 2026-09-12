@@ -34,7 +34,7 @@ export function SettingsView({
   const [settings, setSettings] = useState<UserSettings>({
     account: {
       username: currentUser?.username || 'user',
-      email: currentUser?.email || 'user@vibetok.app',
+      email: currentUser?.email || 'user@hy.app',
       displayName: currentUser?.displayName || 'User',
       bio: currentUser?.bio || '',
     },
@@ -129,7 +129,7 @@ export function SettingsView({
             <div>
               <span className="text-xs text-slate-400 block mb-1 font-semibold">Email</span>
               <p className="text-sm font-mono bg-slate-900/80 px-3.5 py-2 rounded-xl border border-white/10 text-slate-200">
-                {currentUser?.email || 'user@vibetok.app'}
+                {currentUser?.email || 'user@hy.app'}
               </p>
             </div>
           </div>

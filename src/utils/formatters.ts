@@ -34,6 +34,7 @@ export function timeAgo(isoString: string): string {
 
 export const formatRelativeTime = timeAgo;
 export const formatTimeAgo = timeAgo;
+export const formatNumber = formatCount;
 
 export function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60);

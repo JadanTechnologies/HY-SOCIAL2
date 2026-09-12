@@ -26,6 +26,7 @@ interface NavbarProps {
   onOpenLogin: () => void;
   onOpenRegister: () => void;
   unreadNotifsCount?: number;
+  unreadMessagesCount?: number;
 }
 
 export function Navbar({
@@ -36,6 +37,7 @@ export function Navbar({
   onOpenLogin,
   onOpenRegister,
   unreadNotifsCount = 0,
+  unreadMessagesCount = 0,
 }: NavbarProps) {
   const { currentUser, isAuthenticated, logout } = useAuth();
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
@@ -67,7 +69,7 @@ export function Navbar({
             </div>
             <div>
               <span className="font-brand text-2xl font-black tracking-tight text-white flex items-center gap-1">
-                Vibe<span className="text-cyan-400">Tok</span>
+                H<span className="text-cyan-400">Y</span>
               </span>
             </div>
           </button>
@@ -127,7 +129,7 @@ export function Navbar({
           <button
             id="nav-tab-messages"
             onClick={() => handleAuthenticatedAction(() => setActiveRoute('messages'))}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+            className={`relative flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               activeRoute === 'messages'
                 ? 'bg-white/15 text-white shadow-sm'
                 : 'text-slate-400 hover:text-white'
@@ -135,6 +137,9 @@ export function Navbar({
           >
             <MessageSquare className="w-4 h-4" />
             <span>Messages</span>
+            {unreadMessagesCount > 0 && (
+              <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+            )}
           </button>
 
           <button
@@ -310,7 +315,7 @@ export function Navbar({
             <Sparkles className="w-3.5 h-3.5 text-slate-950" />
           </div>
           <span className="font-brand text-lg font-black tracking-tight text-white">
-            Vibe<span className="text-cyan-400">Tok</span>
+            H<span className="text-cyan-400">Y</span>
           </span>
         </button>
 
@@ -321,6 +326,16 @@ export function Navbar({
             aria-label="Search"
           >
             <Search className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => handleAuthenticatedAction(() => setActiveRoute('messages'))}
+            className="relative w-9 h-9 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white border border-white/10"
+            aria-label="Direct Messages"
+          >
+            <MessageSquare className="w-4 h-4" />
+            {unreadMessagesCount > 0 && (
+              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-cyan-400"></span>
+            )}
           </button>
           {isAuthenticated && currentUser ? (
             <button
@@ -401,7 +416,7 @@ export function Navbar({
         >
           <Bell className="w-5 h-5" />
           <span className="text-[10px] font-semibold mt-1">Inbox</span>
-          {unreadNotifsCount > 0 && (
+          {(unreadNotifsCount > 0 || unreadMessagesCount > 0) && (
             <span className="absolute top-1 right-2 w-2 h-2 rounded-full bg-cyan-400"></span>
           )}
         </button>

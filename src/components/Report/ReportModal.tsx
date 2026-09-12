@@ -69,7 +69,7 @@ export function ReportModal({ isOpen, onClose, video }: ReportModalProps) {
             </div>
             <h4 className="text-white font-bold text-base">Report Submitted</h4>
             <p className="text-xs text-gray-400">
-              Thank you for keeping VibeTok safe. Our moderation team will review this content promptly.
+              Thank you for keeping HY safe. Our moderation team will review this content promptly.
             </p>
           </div>
         ) : (

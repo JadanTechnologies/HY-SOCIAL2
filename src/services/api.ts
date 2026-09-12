@@ -1,6 +1,20 @@
-import { User, Video, Comment, Sound, ReportItem, CreatorAnalytics, CreatorStudioDashboard, TimeFilterRange, FeedType, NotificationItem, MessageConversation, FeedResponse } from '../types';
+import { User, Video, Comment, Sound, ReportItem, CreatorAnalytics, CreatorStudioDashboard, TimeFilterRange, FeedType, NotificationItem, MessageConversation, ChatMessage, MessageReactionMap, BlockedUserItem, FeedResponse } from '../types';
 
 const STORAGE_KEY_AUTH = 'vibetok_auth_session';
+
+function getAuthHeaders(): HeadersInit {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_AUTH);
+    if (raw) {
+      const u = JSON.parse(raw);
+      if (u?.id) {
+        headers['x-user-id'] = u.id;
+      }
+    }
+  } catch {}
+  return headers;
+}
 
 export const api = {
   // Current user & session
@@ -356,6 +370,156 @@ export const api = {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to delete video');
+    return data;
+  },
+
+  // ==========================================
+  // PHASE 7: REAL-TIME MESSAGING API METHODS
+  // ==========================================
+  async getConversations(): Promise<{ conversations: MessageConversation[]; totalUnread: number }> {
+    const res = await fetch('/api/messages', {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to fetch conversations');
+    return res.json();
+  },
+
+  async getUnreadMessagesCount(): Promise<{ unreadCount: number }> {
+    const res = await fetch('/api/messages/unread-count', {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) return { unreadCount: 0 };
+    return res.json();
+  },
+
+  async getConversation(conversationId: string): Promise<{ conversation: MessageConversation }> {
+    const res = await fetch(`/api/messages/${conversationId}`, {
+      headers: getAuthHeaders(),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch conversation');
+    return data;
+  },
+
+  async sendMessage(
+    conversationId: string,
+    payload: {
+      text?: string;
+      type?: 'text' | 'video' | 'profile';
+      sharedVideoId?: string;
+      sharedUserId?: string;
+    }
+  ): Promise<{ message: ChatMessage; conversation: MessageConversation }> {
+    const res = await fetch(`/api/messages/${conversationId}`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to send message');
+    return data;
+  },
+
+  async startConversation(payload: {
+    targetUserId: string;
+    initialText?: string;
+    sharedVideoId?: string;
+    sharedUserId?: string;
+  }): Promise<{ conversation: MessageConversation }> {
+    const res = await fetch('/api/messages/start', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to start conversation');
+    return data;
+  },
+
+  async markConversationAsRead(conversationId: string): Promise<{ success: boolean; updatedCount: number }> {
+    const res = await fetch(`/api/messages/${conversationId}/read`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to mark conversation as read');
+    return res.json();
+  },
+
+  async toggleMessageReaction(
+    conversationId: string,
+    messageId: string,
+    emoji: string
+  ): Promise<{ success: boolean; reactions: MessageReactionMap }> {
+    const res = await fetch(`/api/messages/${conversationId}/reaction`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ messageId, emoji }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to update reaction');
+    return data;
+  },
+
+  async sendTypingStatus(conversationId: string, isTyping: boolean): Promise<{ success: boolean }> {
+    const res = await fetch(`/api/messages/${conversationId}/typing`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ isTyping }),
+    });
+    if (!res.ok) return { success: false };
+    return res.json();
+  },
+
+  async blockUser(userId: string): Promise<{ success: boolean; isBlocked: boolean }> {
+    const res = await fetch(`/api/users/${userId}/block`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to block user');
+    return data;
+  },
+
+  async unblockUser(userId: string): Promise<{ success: boolean; isBlocked: boolean }> {
+    const res = await fetch(`/api/users/${userId}/unblock`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to unblock user');
+    return data;
+  },
+
+  async getBlockedUsers(): Promise<{ blockedUsers: BlockedUserItem[] }> {
+    const res = await fetch('/api/users/blocked', {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to fetch blocked users');
+    return res.json();
+  },
+
+  async searchUsers(query?: string): Promise<User[]> {
+    if (!query || !query.trim()) {
+      return this.getUsers();
+    }
+    const res = await this.search(query);
+    return res.users || [];
+  },
+
+  async reportConversationOrMessage(payload: {
+    conversationId: string;
+    messageId?: string;
+    targetUserId: string;
+    reason: string;
+    details?: string;
+  }): Promise<{ success: boolean; message: string }> {
+    const res = await fetch('/api/messages/report', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to submit report');
     return data;
   },
 };

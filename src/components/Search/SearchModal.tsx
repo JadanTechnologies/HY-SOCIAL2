@@ -12,7 +12,7 @@ interface SearchModalProps {
   onSelectHashtag: (tag: string) => void;
 }
 
-const DEFAULT_RECENT = ['#cyberpunk', 'contemporary dance', 'elena_moves', '#skate', 'synth'];
+const DEFAULT_RECENT = ['#afrobeats', 'amapiano dance', 'amaka_steps', '#lagosvibes', 'jollof rice'];
 
 export function SearchModal({
   isOpen,
@@ -206,7 +206,7 @@ export function SearchModal({
             </div>
           ) : loading ? (
             <div className="py-12 text-center text-xs text-slate-400">
-              Searching VibeTok repository...
+              Searching HY repository...
             </div>
           ) : totalResults === 0 ? (
             <div className="py-12 text-center text-slate-400">

@@ -89,7 +89,7 @@ export function ExploreView({
   };
 
   const isSearching = searchQuery.trim().length > 0;
-  const trendingTags = ['dance', 'cyberpunk', 'skate', 'synth', 'oceanvibes', 'cinematic', 'studioflow'];
+  const trendingTags = ['afrobeats', 'amapiano', 'lagosvibes', 'jollofrice', 'skate', 'tarkwabay', 'lekki', 'cinematic'];
 
   return (
     <div
@@ -160,7 +160,7 @@ export function ExploreView({
         <div className="space-y-8">
           {loading ? (
             <div className="py-16 text-center text-sm text-gray-400 animate-pulse">
-              Searching VibeTok universe...
+              Searching HY universe...
             </div>
           ) : (
             <>

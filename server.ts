@@ -1,9 +1,13 @@
 import express from 'express';
 import path from 'path';
+import http from 'http';
+import { WebSocketServer, WebSocket } from 'ws';
 import { createServer as createViteServer } from 'vite';
 
 const app = express();
 const PORT = 3000;
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server, path: '/ws' });
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -97,17 +101,52 @@ interface DBNotification {
   createdAt: string;
 }
 
+interface DBMessageReactionMap {
+  [emoji: string]: string[]; // emoji -> array of userIds
+}
+
+interface DBMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  recipientId: string;
+  text: string;
+  sentAt: string;
+  read: boolean;
+  readAt?: string;
+  type?: 'text' | 'video' | 'profile';
+  sharedVideoId?: string;
+  sharedUserId?: string;
+  reactions?: DBMessageReactionMap;
+  status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+}
+
 interface DBMessageConversation {
   id: string;
   participantIds: string[];
   lastMessage: string;
   lastMessageAt: string;
-  messages: {
-    id: string;
-    senderId: string;
-    text: string;
-    sentAt: string;
-  }[];
+  lastSenderId?: string;
+  createdAt: string;
+  messages: DBMessage[];
+}
+
+interface DBBlockedUser {
+  id: string;
+  blockerId: string;
+  blockedId: string;
+  createdAt: string;
+}
+
+interface DBMessageReport {
+  id: string;
+  conversationId: string;
+  messageId?: string;
+  reportedBy: string;
+  targetUserId: string;
+  reason: string;
+  details?: string;
+  createdAt: string;
 }
 
 interface DBReport {
@@ -123,89 +162,106 @@ interface DBReport {
 // Initial Users
 const users: DBUser[] = [
   {
-    id: 'u-current',
-    email: 'alex@vibetok.app',
-    username: 'alex_rivers',
-    displayName: 'Alex Rivers',
-    passwordHash: 'password123',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
-    bio: 'Visual storyteller & sound designer 🎧 | Creating daily micro-cinema ✨',
-    website: 'https://alexrivers.studio',
-    verified: true,
-    followersCount: 84200,
-    followingCount: 340,
-    likesCount: 1420000,
-    role: 'creator',
-  },
-  {
-    id: 'u-1',
-    email: 'elena@vibetok.app',
-    username: 'elena_moves',
-    displayName: 'Elena Vance',
-    passwordHash: 'password123',
-    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400&auto=format&fit=crop&q=80',
-    bio: 'Choreographer & contemporary motion artist 💃 Studio sessions in NYC',
-    website: 'https://elenavance.art',
-    verified: true,
-    followersCount: 432000,
-    followingCount: 180,
-    likesCount: 5800000,
-    role: 'creator',
-  },
-  {
-    id: 'u-2',
-    email: 'kai@vibetok.app',
-    username: 'cyber_kai',
-    displayName: 'Kai Tanaka',
-    passwordHash: 'password123',
+    id: 'u-jadan',
+    email: 'jadanexpress.info@gmail.com',
+    username: 'jadan',
+    displayName: 'Jabir Dangaskiya',
+    passwordHash: 'jadan',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80',
-    bio: 'Creative coder & Tokyo night explorer ⚡ Next-gen visual computing',
+    bio: 'Tech innovator, Creator & Media Producer 🚀🇳🇬 | Building the future on HY | Kano & Abuja ✨',
+    website: 'https://jadanexpress.info',
     verified: true,
-    followersCount: 198000,
-    followingCount: 420,
-    likesCount: 2300000,
-    role: 'creator',
-  },
-  {
-    id: 'u-3',
-    email: 'sam@vibetok.app',
-    username: 'skate_sam',
-    displayName: 'Sam Ortiz',
-    passwordHash: 'password123',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&auto=format&fit=crop&q=80',
-    bio: 'Sunset sessions & concrete waves 🛹 Venice Beach, CA',
-    verified: false,
-    followersCount: 67500,
-    followingCount: 290,
-    likesCount: 890000,
-    role: 'creator',
-  },
-  {
-    id: 'u-4',
-    email: 'aura@vibetok.app',
-    username: 'synth_aura',
-    displayName: 'Aura Soundscapes',
-    passwordHash: 'password123',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop&q=80',
-    bio: 'Analog modular synthesizers & lo-fi beats to dream to 🎹',
-    verified: true,
-    followersCount: 312000,
-    followingCount: 95,
+    followersCount: 315000,
+    followingCount: 280,
     likesCount: 4200000,
     role: 'creator',
   },
   {
+    id: 'u-current',
+    email: 'tobi@hy.app',
+    username: 'tobi_bakare',
+    displayName: 'Tobi Bakare',
+    passwordHash: 'password123',
+    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&auto=format&fit=crop&q=80',
+    bio: 'Filmmaker & Visual Storyteller 🎥 | Capturing Lagos golden hours & street stories 🇳🇬✨ Lekki, Lagos',
+    website: 'https://tobibakare.ng',
+    verified: true,
+    followersCount: 184200,
+    followingCount: 340,
+    likesCount: 2420000,
+    role: 'creator',
+  },
+  {
+    id: 'u-1',
+    email: 'amaka@hy.app',
+    username: 'amaka_steps',
+    displayName: 'Amaka Okafor',
+    passwordHash: 'password123',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
+    bio: 'Afrobeats & Amapiano choreographer 💃🏿 Lagos dance academy | Catch the rhythm 🇳🇬✨',
+    website: 'https://amakasteps.com',
+    verified: true,
+    followersCount: 532000,
+    followingCount: 180,
+    likesCount: 6800000,
+    role: 'creator',
+  },
+  {
+    id: 'u-2',
+    email: 'tunde@hy.app',
+    username: 'tunde_soundz',
+    displayName: 'Tunde Adebayo',
+    passwordHash: 'password123',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80',
+    bio: 'Afro-fusion music producer & audio architect 🎹 Lekki Phase 1, Lagos | Grammy season loading ⚡🇳🇬',
+    website: 'https://tundesoundz.io',
+    verified: true,
+    followersCount: 398000,
+    followingCount: 420,
+    likesCount: 4300000,
+    role: 'creator',
+  },
+  {
+    id: 'u-3',
+    email: 'kemi@hy.app',
+    username: 'kemi_delights',
+    displayName: 'Kemi Adeleke',
+    passwordHash: 'password123',
+    avatar: 'https://images.unsplash.com/photo-1589156280159-27698a70f29e?w=400&auto=format&fit=crop&q=80',
+    bio: 'Jollof connoisseur, food creator & Naija street-food explorer 🍲 Suya & spicy treats 🌶️ Abuja & Lagos',
+    website: 'https://kemidelights.ng',
+    verified: true,
+    followersCount: 267500,
+    followingCount: 290,
+    likesCount: 3890000,
+    role: 'creator',
+  },
+  {
+    id: 'u-4',
+    email: 'emeka@hy.app',
+    username: 'emeka_skates',
+    displayName: 'Emeka Nwosu',
+    passwordHash: 'password123',
+    avatar: 'https://images.unsplash.com/photo-1522529599102-193c0d76b5b6?w=400&auto=format&fit=crop&q=80',
+    bio: 'Lagos street skater & concrete pioneer 🛹 National Stadium Surulere & TBS sessions 🇳🇬',
+    verified: false,
+    followersCount: 142000,
+    followingCount: 195,
+    likesCount: 1950000,
+    role: 'creator',
+  },
+  {
     id: 'u-admin',
-    email: 'admin@vibetok.app',
-    username: 'mod_staff',
-    displayName: 'VibeTok Trust & Safety',
+    email: 'admin@hy.app',
+    username: 'hy_safety',
+    displayName: 'HY Trust & Safety Nigeria',
     passwordHash: 'admin123',
     avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80',
-    bio: 'Official platform operations & community moderation portal 🛡️',
+    bio: 'Official HY platform operations & creator community moderation for Nigeria & Africa 🛡️🇳🇬',
     verified: true,
-    followersCount: 1200,
+    followersCount: 45200,
     followingCount: 12,
-    likesCount: 45000,
+    likesCount: 185000,
     role: 'admin',
   },
 ];
@@ -214,35 +270,35 @@ const users: DBUser[] = [
 const sounds: DBSound[] = [
   {
     id: 's-1',
-    title: 'Midnight Echoes (Slowed + Reverb)',
-    author: 'Aura Soundscapes',
+    title: 'Gbagbe (Afrobeats Instrumental)',
+    author: 'Tunde Adebayo & The Lagos All-Stars',
     coverUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=200&auto=format&fit=crop&q=80',
     durationSeconds: 32,
-    useCount: 128400,
+    useCount: 248400,
   },
   {
     id: 's-2',
-    title: 'Tokyo Neon Velocity',
-    author: 'Kai Tanaka',
+    title: 'Lekki Sunset Amapiano Log Drum',
+    author: 'Amaka Okafor & DJ Spinall',
     coverUrl: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=200&auto=format&fit=crop&q=80',
-    durationSeconds: 24,
-    useCount: 84300,
+    durationSeconds: 26,
+    useCount: 184300,
   },
   {
     id: 's-3',
-    title: 'Venice Golden Hour Groove',
-    author: 'DJ West Coast',
+    title: 'Ojuelegba Vibe (Acoustic Remix)',
+    author: 'Mainland Strings Lagos',
     coverUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=200&auto=format&fit=crop&q=80',
     durationSeconds: 28,
-    useCount: 45100,
+    useCount: 95100,
   },
   {
     id: 's-4',
-    title: 'Fluid Rhythm 120BPM',
-    author: 'Elena Vance & Beats',
+    title: 'Naija Party Beat 128BPM',
+    author: 'Sarz Type Beats Lagos',
     coverUrl: 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=200&auto=format&fit=crop&q=80',
-    durationSeconds: 40,
-    useCount: 93200,
+    durationSeconds: 35,
+    useCount: 163200,
   },
 ];
 
@@ -251,12 +307,12 @@ let videos: DBVideo[] = [
   {
     id: 'v-1',
     authorId: 'u-1',
-    title: 'Contemporary Studio Flow',
-    caption: 'Finding stillness inside chaotic choreography. Practice take 47 at 2 AM ✨ #dance #vibes #contemporary #studioflow',
+    title: 'Lekki Amapiano Footwork Challenge',
+    caption: 'Learned this new South African log-drum step and added Lagos energy! Wait for the drop at 0:08 💃🏿🔥 Who wants the full tutorial? #afrobeats #amapiano #lagosdance #nigeria #vibes',
     videoUrl: '/videos/dance_flow.mp4',
     thumbnailUrl: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=800&auto=format&fit=crop&q=80',
-    hashtags: ['dance', 'vibes', 'contemporary', 'studioflow'],
-    soundId: 's-4',
+    hashtags: ['afrobeats', 'amapiano', 'lagosdance', 'nigeria', 'vibes'],
+    soundId: 's-2',
     duration: 14,
     dimensions: { width: 720, height: 1280 },
     fileSize: 1600000,
@@ -278,12 +334,12 @@ let videos: DBVideo[] = [
   {
     id: 'v-2',
     authorId: 'u-2',
-    title: 'Cyberpunk Rain Reflections',
-    caption: 'Cyberpunk rain reflections in Shinjuku alleys. Shot entirely on anamorphic mobile glass ⚡ #cyberpunk #tokyo #cinematic #nightvibes',
+    title: 'Producing an Afrobeats Banger in Lekki Phase 1',
+    caption: 'Cooking up live melodies in the Lekki studio with pure Lagos energy! When that log drum drops 🎹⚡ Tell me which Nigerian artist should jump on this! #afrobeats #musicproducer #lagosmusic #burnaboy #wizkid',
     videoUrl: '/videos/cyberpunk_tokyo.mp4',
     thumbnailUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop&q=80',
-    hashtags: ['cyberpunk', 'tokyo', 'cinematic', 'nightvibes'],
-    soundId: 's-2',
+    hashtags: ['afrobeats', 'musicproducer', 'lagosmusic', 'lagos', 'vibes'],
+    soundId: 's-1',
     duration: 14,
     dimensions: { width: 720, height: 1280 },
     fileSize: 1500000,
@@ -304,12 +360,12 @@ let videos: DBVideo[] = [
   },
   {
     id: 'v-3',
-    authorId: 'u-3',
-    title: 'Venice Golden Sunset Kickflip',
-    caption: 'Clean impossible kickflip down the 6-stair into the golden sunset 🛹 Never stop pushing! #skate #venicebeach #slowmo #summer',
+    authorId: 'u-4',
+    title: 'Skating through Marina & Lagos Island',
+    caption: 'Dodging yellow Danfo buses and hitting a clean tre-flip on Marina road 🛹 Lagos traffic cannot stop this skate grind! #lagos #skateboarding #nigeria #marina #energy',
     videoUrl: '/videos/venice_skate.mp4',
     thumbnailUrl: 'https://images.unsplash.com/photo-1520045892732-304bc3ac5d8e?w=800&auto=format&fit=crop&q=80',
-    hashtags: ['skate', 'venicebeach', 'slowmo', 'summer'],
+    hashtags: ['lagos', 'skateboarding', 'nigeria', 'marina', 'energy'],
     soundId: 's-3',
     duration: 14,
     dimensions: { width: 720, height: 1280 },
@@ -331,13 +387,13 @@ let videos: DBVideo[] = [
   },
   {
     id: 'v-4',
-    authorId: 'u-4',
-    title: 'Moog Tape Delay Session',
-    caption: 'Dialing in the analog tape delay warmth on the Moog Grandmother 🎹 What chords do you feel here? #synth #modular #musicproducer #beats',
+    authorId: 'u-3',
+    title: 'Secret Smokey Party Jollof Recipe',
+    caption: 'The real secret to authentic Nigerian party Jollof rice is all in the firewood smoke technique 🍲🔥 No shortcuts! Drop a comment if you want the ingredient list! #jollofrice #nigerianfood #naijaeats #foodie #lagos',
     videoUrl: '/videos/tape_synth.mp4',
     thumbnailUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop&q=80',
-    hashtags: ['synth', 'modular', 'musicproducer', 'beats'],
-    soundId: 's-1',
+    hashtags: ['jollofrice', 'nigerianfood', 'naijaeats', 'foodie', 'lagos'],
+    soundId: 's-4',
     duration: 14,
     dimensions: { width: 720, height: 1280 },
     fileSize: 1500000,
@@ -359,11 +415,11 @@ let videos: DBVideo[] = [
   {
     id: 'v-5',
     authorId: 'u-current',
-    title: 'Dusk Ocean Ripples',
-    caption: 'Ocean ripples at dusk. Take a deep breath and let this audio wash over you 🌊 #nature #oceanvibes #meditation #chill',
+    title: 'Tarkwa Bay Golden Hour Waves',
+    caption: 'Took a boat ride out to Tarkwa Bay, Lagos at sunset. Pure peace away from the city hustle 🌊🇳🇬 Breathe in this serenity! #tarkwabay #lagos #nigeria #beachvibes #cinematic',
     videoUrl: '/videos/coastal_waves.mp4',
     thumbnailUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&auto=format&fit=crop&q=80',
-    hashtags: ['nature', 'oceanvibes', 'meditation', 'chill'],
+    hashtags: ['tarkwabay', 'lagos', 'nigeria', 'beachvibes', 'cinematic'],
     soundId: 's-1',
     duration: 14,
     dimensions: { width: 720, height: 1280 },
@@ -386,11 +442,11 @@ let videos: DBVideo[] = [
   {
     id: 'v-6',
     authorId: 'u-current',
-    title: 'Analog 35mm Tokyo Nights',
-    caption: 'Grain, neon and late rain in Shibuya. Kodak Portra color recipe breakdown in description 🎞️ #cinematic #film #tokyo #colorgrading',
+    title: 'Lekki-Ikoyi Link Bridge at Night',
+    caption: 'Late night cinematics over the Lekki-Ikoyi bridge lights. Lagos at night has an unmatched spirit 🌉✨ #lagos #lekki #cinematography #nightlights #nigeria',
     videoUrl: '/videos/cyberpunk_tokyo.mp4',
     thumbnailUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop&q=80',
-    hashtags: ['cinematic', 'film', 'tokyo', 'colorgrading'],
+    hashtags: ['lagos', 'lekki', 'cinematography', 'nightlights', 'nigeria'],
     soundId: 's-2',
     duration: 14,
     dimensions: { width: 720, height: 1280 },
@@ -413,12 +469,12 @@ let videos: DBVideo[] = [
   {
     id: 'v-7',
     authorId: 'u-current',
-    title: 'Tape Synth Lo-Fi Reverie',
-    caption: 'Exclusive follower preview: recorded directly to a 1982 Tascam 4-track cassette recorder 📼 #lofi #tape #synths #exclusive',
+    title: 'Balogun Market Soundscape & Colors',
+    caption: 'Follower exclusive: 4K slow motion through the vibrant fabrics and bustling energy of Balogun Market 🛍️ #lagosmarket #culture #nigeria #exclusive',
     videoUrl: '/videos/tape_synth.mp4',
     thumbnailUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop&q=80',
-    hashtags: ['lofi', 'tape', 'synths', 'exclusive'],
-    soundId: 's-1',
+    hashtags: ['lagosmarket', 'culture', 'nigeria', 'exclusive'],
+    soundId: 's-3',
     duration: 14,
     dimensions: { width: 720, height: 1280 },
     fileSize: 1450000,
@@ -440,11 +496,11 @@ let videos: DBVideo[] = [
   {
     id: 'v-8',
     authorId: 'u-current',
-    title: 'Venice Golden Hour Kinetic Study',
-    caption: 'Capturing dynamic skate trajectory with low-angle gimbal tracking. Shot at 120fps 🛹 #skate #cinematography #goldenhour #action',
+    title: 'National Stadium Skate Kinetics',
+    caption: 'High speed gimbal tracking with @emeka_skates at Surulere National Stadium. 120fps butter smooth 🛹🇳🇬 #surulere #skate #lagos #cinematic',
     videoUrl: '/videos/venice_skate.mp4',
     thumbnailUrl: 'https://images.unsplash.com/photo-1520045892732-304bc3ac5d8e?w=800&auto=format&fit=crop&q=80',
-    hashtags: ['skate', 'cinematography', 'goldenhour', 'action'],
+    hashtags: ['surulere', 'skate', 'lagos', 'cinematic'],
     soundId: 's-3',
     duration: 14,
     dimensions: { width: 720, height: 1280 },
@@ -467,11 +523,11 @@ let videos: DBVideo[] = [
   {
     id: 'v-9',
     authorId: 'u-current',
-    title: 'Choreography Flow Behind the Scenes (Draft)',
-    caption: 'Private work-in-progress draft: testing movement pacing against sound stem 🩰 #bts #draft #movement',
+    title: 'Afrobeats Music Video Director Cut (BTS)',
+    caption: 'Private draft: testing color grade for our upcoming music video shoot in Victoria Island 🎬 #bts #director #musicvideo #lagos',
     videoUrl: '/videos/dance_flow.mp4',
     thumbnailUrl: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=800&auto=format&fit=crop&q=80',
-    hashtags: ['bts', 'draft', 'movement'],
+    hashtags: ['bts', 'director', 'musicvideo', 'lagos'],
     soundId: 's-4',
     duration: 14,
     dimensions: { width: 720, height: 1280 },
@@ -491,6 +547,33 @@ let videos: DBVideo[] = [
     allowDuet: false,
     status: 'ready',
   },
+  {
+    id: 'v-jadan-1',
+    authorId: 'u-jadan',
+    title: 'Aso Rock Sunset & Abuja Tech Horizons',
+    caption: 'Golden hour drone view overlooking Aso Rock and the Central Business District. Northern tech & creative community rising! 🇳🇬✨ #abuja #kano #nigeriatech #jadan #innovation #hy',
+    videoUrl: '/videos/coastal_waves.mp4',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&auto=format&fit=crop&q=80',
+    hashtags: ['abuja', 'kano', 'nigeriatech', 'jadan', 'innovation', 'hy'],
+    soundId: 's-1',
+    duration: 14,
+    dimensions: { width: 720, height: 1280 },
+    fileSize: 1600000,
+    visibility: 'public',
+    processingStatus: 'ready',
+    created_at: new Date(Date.now() - 3600000 * 4).toISOString(),
+    updated_at: new Date(Date.now() - 3600000 * 4).toISOString(),
+    likesCount: 142300,
+    commentsCount: 2310,
+    savesCount: 18900,
+    sharesCount: 7500,
+    viewsCount: 890000,
+    createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
+    privacy: 'public',
+    allowComments: true,
+    allowDuet: true,
+    status: 'ready',
+  },
 ];
 
 // User interaction sets
@@ -504,7 +587,7 @@ let comments: DBComment[] = [
     id: 'c-1',
     videoId: 'v-1',
     authorId: 'u-2',
-    text: 'That transition at 0:08 was breathtaking! The smoke framing works so well 🔥',
+    text: 'Omo that transition at 0:08 was too clean! The legwork is giving pure fire 🔥🇳🇬',
     createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
     likesCount: 342,
     repliesCount: 3,
@@ -512,8 +595,8 @@ let comments: DBComment[] = [
   {
     id: 'c-2',
     videoId: 'v-1',
-    authorId: 'u-3',
-    text: 'Incredible precision! Need a tutorial on that floor sweep move',
+    authorId: 'u-4',
+    text: 'E choke! Senior woman abeg drop the footwork tutorial before Saturday party! 🙌',
     createdAt: new Date(Date.now() - 3600000 * 1).toISOString(),
     likesCount: 118,
     repliesCount: 0,
@@ -522,7 +605,7 @@ let comments: DBComment[] = [
     id: 'c-3',
     videoId: 'v-2',
     authorId: 'u-1',
-    text: 'Those color grades are next level. Cyberpunk masterpiece!',
+    text: 'This beat is mental! Rema or Asake need to hop on this immediately! 🎹🚀',
     createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
     likesCount: 521,
     repliesCount: 8,
@@ -531,10 +614,19 @@ let comments: DBComment[] = [
     id: 'c-4',
     videoId: 'v-3',
     authorId: 'u-current',
-    text: 'Catching that sunset light right at the apex of the pop was perfection 🛹',
+    text: 'Landing that kickflip right beside the Danfo bus was wild! Lagos street energy is unmatched 🛹',
     createdAt: new Date(Date.now() - 3600000 * 6).toISOString(),
     likesCount: 84,
     repliesCount: 1,
+  },
+  {
+    id: 'c-5',
+    videoId: 'v-4',
+    authorId: 'u-3',
+    text: 'Party Jollof will always be superior to Sunday rice, no debate! 🍲🇳🇬',
+    createdAt: new Date(Date.now() - 3600000 * 10).toISOString(),
+    likesCount: 246,
+    repliesCount: 5,
   },
 ];
 
@@ -547,7 +639,7 @@ let notifications: DBNotification[] = [
     type: 'like',
     videoId: 'v-5',
     videoThumbnail: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&auto=format&fit=crop&q=80',
-    text: 'liked your video "Ocean ripples at dusk"',
+    text: 'liked your video "Tarkwa Bay Golden Hour Waves"',
     read: false,
     createdAt: new Date(Date.now() - 3600000 * 1.5).toISOString(),
   },
@@ -556,7 +648,7 @@ let notifications: DBNotification[] = [
     recipientId: 'u-current',
     actorId: 'u-2',
     type: 'follow',
-    text: 'started following your creative journey',
+    text: 'started following your creative journey from Lekki',
     read: false,
     createdAt: new Date(Date.now() - 3600000 * 5).toISOString(),
   },
@@ -567,7 +659,7 @@ let notifications: DBNotification[] = [
     type: 'comment',
     videoId: 'v-5',
     videoThumbnail: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&auto=format&fit=crop&q=80',
-    text: 'commented: "That ambient soundtrack is pure gold 🎧"',
+    text: 'commented: "That Tarkwa Bay sunset color grading is pure art 🇳🇬✨"',
     read: true,
     createdAt: new Date(Date.now() - 3600000 * 18).toISOString(),
   },
@@ -576,69 +668,296 @@ let notifications: DBNotification[] = [
     recipientId: 'u-current',
     actorId: 'u-admin',
     type: 'system',
-    text: 'Welcome to VibeTok Phase 1! Your creator profile is live and verified.',
+    text: 'Welcome to HY Nigeria! Your creator profile is verified and ready to share vibes.',
     read: true,
     createdAt: new Date(Date.now() - 3600000 * 48).toISOString(),
   },
 ];
 
 // Message Conversations
+let blockedUsers: DBBlockedUser[] = [];
+let messageReports: DBMessageReport[] = [];
+
 let conversations: DBMessageConversation[] = [
   {
     id: 'conv-1',
     participantIds: ['u-current', 'u-1'],
-    lastMessage: 'Would love to collaborate on a soundscape for your next choreography piece!',
+    lastMessage: 'Would love to collaborate on the visual video for your next dance challenge in Victoria Island!',
     lastMessageAt: new Date(Date.now() - 3600000 * 3).toISOString(),
+    lastSenderId: 'u-1',
+    createdAt: new Date(Date.now() - 3600000 * 48).toISOString(),
     messages: [
       {
         id: 'm-1',
+        conversationId: 'conv-1',
         senderId: 'u-1',
-        text: 'Hey Alex! Loved your recent tape-delay video.',
+        recipientId: 'u-current',
+        text: 'Hey Tobi! Loved your Tarkwa Bay sunset video.',
         sentAt: new Date(Date.now() - 3600000 * 24).toISOString(),
+        read: true,
+        readAt: new Date(Date.now() - 3600000 * 23).toISOString(),
+        type: 'text',
+        reactions: { '❤️': ['u-current'] },
+        status: 'read',
       },
       {
         id: 'm-2',
+        conversationId: 'conv-1',
         senderId: 'u-current',
-        text: 'Thanks Elena! Your studio flow was incredible.',
+        recipientId: 'u-1',
+        text: 'Thanks Amaka! Your Amapiano footwork on the bridge was incredible.',
         sentAt: new Date(Date.now() - 3600000 * 12).toISOString(),
+        read: true,
+        readAt: new Date(Date.now() - 3600000 * 10).toISOString(),
+        type: 'text',
+        reactions: { '🔥': ['u-1'] },
+        status: 'read',
       },
       {
         id: 'm-3',
+        conversationId: 'conv-1',
         senderId: 'u-1',
-        text: 'Would love to collaborate on a soundscape for your next choreography piece!',
+        recipientId: 'u-current',
+        text: 'Would love to collaborate on the visual video for your next dance challenge in Victoria Island!',
         sentAt: new Date(Date.now() - 3600000 * 3).toISOString(),
+        read: false,
+        type: 'text',
+        reactions: {},
+        status: 'delivered',
       },
     ],
   },
   {
     id: 'conv-2',
     participantIds: ['u-current', 'u-2'],
-    lastMessage: 'Sent you the color profile for the Shinjuku neon shots ⚡',
+    lastMessage: 'Check out this Lekki studio preview beat!',
     lastMessageAt: new Date(Date.now() - 3600000 * 9).toISOString(),
+    lastSenderId: 'u-2',
+    createdAt: new Date(Date.now() - 3600000 * 36).toISOString(),
     messages: [
       {
         id: 'm-4',
+        conversationId: 'conv-2',
         senderId: 'u-2',
-        text: 'Sent you the color profile for the Shinjuku neon shots ⚡',
+        recipientId: 'u-current',
+        text: 'Bro, sending you the audio stems for the new Afrobeats soundtrack 🎹',
+        sentAt: new Date(Date.now() - 3600000 * 15).toISOString(),
+        read: true,
+        readAt: new Date(Date.now() - 3600000 * 14).toISOString(),
+        type: 'text',
+        reactions: {},
+        status: 'read',
+      },
+      {
+        id: 'm-4b',
+        conversationId: 'conv-2',
+        senderId: 'u-2',
+        recipientId: 'u-current',
+        text: 'Check out this Lekki studio preview beat!',
         sentAt: new Date(Date.now() - 3600000 * 9).toISOString(),
+        read: false,
+        type: 'video',
+        sharedVideoId: 'v-2',
+        reactions: { '🔥': ['u-current'] },
+        status: 'delivered',
       },
     ],
   },
   {
     id: 'conv-3',
-    participantIds: ['u-current', 'u-3'],
-    lastMessage: 'Next sunset skate session is Friday 5pm if you want to film some clips 🛹',
+    participantIds: ['u-current', 'u-4'],
+    lastMessage: 'Next skate session is Friday 4pm at TBS Lagos if you want to shoot some 4K b-roll 🛹',
     lastMessageAt: new Date(Date.now() - 3600000 * 30).toISOString(),
+    lastSenderId: 'u-4',
+    createdAt: new Date(Date.now() - 3600000 * 60).toISOString(),
     messages: [
       {
         id: 'm-5',
-        senderId: 'u-3',
-        text: 'Next sunset skate session is Friday 5pm if you want to film some clips 🛹',
+        conversationId: 'conv-3',
+        senderId: 'u-4',
+        recipientId: 'u-current',
+        text: 'Next skate session is Friday 4pm at TBS Lagos if you want to shoot some 4K b-roll 🛹',
         sentAt: new Date(Date.now() - 3600000 * 30).toISOString(),
+        read: true,
+        readAt: new Date(Date.now() - 3600000 * 29).toISOString(),
+        type: 'text',
+        reactions: { '💯': ['u-current'] },
+        status: 'read',
+      },
+    ],
+  },
+  {
+    id: 'conv-4',
+    participantIds: ['u-current', 'u-3'],
+    lastMessage: "Hey Kemi, let's lock in next Tuesday before the lunch rush! Bring that party jollof magic.",
+    lastMessageAt: new Date(Date.now() - 3600000 * 4).toISOString(),
+    lastSenderId: 'u-current',
+    createdAt: new Date(Date.now() - 3600000 * 12).toISOString(),
+    messages: [
+      {
+        id: 'm-6',
+        conversationId: 'conv-4',
+        senderId: 'u-3',
+        recipientId: 'u-current',
+        text: 'Tobi! When are we shooting the street food documentary episode at Ikeja under bridge? 🍲✨',
+        sentAt: new Date(Date.now() - 3600000 * 6).toISOString(),
+        read: true,
+        readAt: new Date(Date.now() - 3600000 * 5).toISOString(),
+        type: 'text',
+        reactions: { '🙌': ['u-current'] },
+        status: 'read',
+      },
+      {
+        id: 'm-7',
+        conversationId: 'conv-4',
+        senderId: 'u-current',
+        recipientId: 'u-3',
+        text: "Hey Kemi, let's lock in next Tuesday before the lunch rush! Bring that party jollof magic.",
+        sentAt: new Date(Date.now() - 3600000 * 4).toISOString(),
+        read: true,
+        readAt: new Date(Date.now() - 3600000 * 3).toISOString(),
+        type: 'text',
+        reactions: { '❤️': ['u-3'] },
+        status: 'read',
+      },
+    ],
+  },
+  {
+    id: 'conv-5',
+    participantIds: ['u-current', 'u-jadan'],
+    lastMessage: 'Looking forward to collaborating on the visual series across Abuja and Lagos! 🚀🇳🇬',
+    lastMessageAt: new Date(Date.now() - 3600000 * 2).toISOString(),
+    lastSenderId: 'u-jadan',
+    createdAt: new Date(Date.now() - 3600000 * 10).toISOString(),
+    messages: [
+      {
+        id: 'm-8',
+        conversationId: 'conv-5',
+        senderId: 'u-current',
+        recipientId: 'u-jadan',
+        text: 'Salam Jabir! Welcome to HY. Excited to see what you create on the platform.',
+        sentAt: new Date(Date.now() - 3600000 * 5).toISOString(),
+        read: true,
+        readAt: new Date(Date.now() - 3600000 * 4).toISOString(),
+        type: 'text',
+        reactions: { '🙌': ['u-jadan'] },
+        status: 'read',
+      },
+      {
+        id: 'm-9',
+        conversationId: 'conv-5',
+        senderId: 'u-jadan',
+        recipientId: 'u-current',
+        text: 'Looking forward to collaborating on the visual series across Abuja and Lagos! 🚀🇳🇬',
+        sentAt: new Date(Date.now() - 3600000 * 2).toISOString(),
+        read: true,
+        readAt: new Date(Date.now() - 3600000 * 1).toISOString(),
+        type: 'text',
+        reactions: { '🔥': ['u-current'] },
+        status: 'read',
       },
     ],
   },
 ];
+
+// WebSocket Presence & Rate Limiting Infrastructure
+const userSockets = new Map<string, Set<WebSocket>>();
+const userLastSeen = new Map<string, string>();
+userLastSeen.set('u-jadan', new Date().toISOString());
+userLastSeen.set('u-1', new Date(Date.now() - 1000 * 60 * 3).toISOString());
+userLastSeen.set('u-2', new Date(Date.now() - 1000 * 60 * 25).toISOString());
+userLastSeen.set('u-3', new Date().toISOString());
+userLastSeen.set('u-4', new Date(Date.now() - 1000 * 60 * 12).toISOString());
+
+const userMessageRateMap = new Map<string, number[]>();
+
+function checkRateLimit(userId: string): boolean {
+  const now = Date.now();
+  const windowMs = 60 * 1000;
+  const maxMessages = 30; // 30 msgs / min
+  let timestamps = userMessageRateMap.get(userId) || [];
+  timestamps = timestamps.filter((t) => now - t < windowMs);
+  if (timestamps.length >= maxMessages) {
+    return false;
+  }
+  timestamps.push(now);
+  userMessageRateMap.set(userId, timestamps);
+  return true;
+}
+
+function sendToUser(userId: string, payload: any) {
+  const sockets = userSockets.get(userId);
+  if (sockets) {
+    const msg = JSON.stringify(payload);
+    sockets.forEach((ws) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(msg);
+      }
+    });
+  }
+}
+
+function broadcastPresence(userId: string, isOnline: boolean, lastSeen?: string) {
+  const msg = JSON.stringify({
+    type: 'presence',
+    userId,
+    isOnline,
+    lastSeen: lastSeen || new Date().toISOString(),
+  });
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(msg);
+    }
+  });
+}
+
+wss.on('connection', (ws: WebSocket) => {
+  let authedUserId: string | null = null;
+
+  ws.on('message', (raw) => {
+    try {
+      const data = JSON.parse(raw.toString());
+      if (data.type === 'auth') {
+        authedUserId = data.userId;
+        if (authedUserId) {
+          if (!userSockets.has(authedUserId)) {
+            userSockets.set(authedUserId, new Set());
+          }
+          userSockets.get(authedUserId)!.add(ws);
+          userLastSeen.set(authedUserId, new Date().toISOString());
+          broadcastPresence(authedUserId, true);
+        }
+      } else if (data.type === 'typing') {
+        const { conversationId, recipientId, isTyping } = data;
+        if (authedUserId && recipientId) {
+          sendToUser(recipientId, {
+            type: 'typing',
+            conversationId,
+            senderId: authedUserId,
+            isTyping: Boolean(isTyping),
+          });
+        }
+      } else if (data.type === 'ping') {
+        ws.send(JSON.stringify({ type: 'pong' }));
+      }
+    } catch (err) {
+      console.error('[WS] Error processing message:', err);
+    }
+  });
+
+  ws.on('close', () => {
+    if (authedUserId && userSockets.has(authedUserId)) {
+      const set = userSockets.get(authedUserId)!;
+      set.delete(ws);
+      if (set.size === 0) {
+        userSockets.delete(authedUserId);
+        const iso = new Date().toISOString();
+        userLastSeen.set(authedUserId, iso);
+        broadcastPresence(authedUserId, false, iso);
+      }
+    }
+  });
+});
 
 // Reports
 let reports: DBReport[] = [
@@ -684,7 +1003,7 @@ const VIEW_COOLDOWN_MS = 5 * 60 * 1000; // 5 mins cooldown for duplicate views
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', service: 'VibeTok Core Engine', phase: '1' });
+  res.json({ status: 'ok', service: 'HY Core Engine', phase: '1' });
 });
 
 // Current User info
@@ -748,7 +1067,7 @@ app.post('/api/auth/register', (req, res) => {
     displayName: displayName?.trim() || cleanUsername,
     passwordHash: password,
     avatar: chosenAvatar,
-    bio: 'Creator on VibeTok ✨',
+    bio: 'Creator on HY 🇳🇬✨',
     verified: false,
     followersCount: 0,
     followingCount: 0,
@@ -765,7 +1084,7 @@ app.post('/api/auth/register', (req, res) => {
     recipientId: newUser.id,
     actorId: 'u-admin',
     type: 'system',
-    text: `Welcome to VibeTok, @${newUser.username}! Discover top creators or share your first vibe.`,
+    text: `Welcome to HY, @${newUser.username}! Discover top Nigerian creators or share your first vibe.`,
     read: false,
     createdAt: new Date().toISOString(),
   });
@@ -1219,7 +1538,7 @@ app.post('/api/videos/upload', (req, res) => {
     id: `v-${Date.now()}`,
     authorId: currentUserId,
     title: (title || caption || 'Fresh Vibe').trim().slice(0, 80),
-    caption: caption || 'New vibe published on VibeTok ✨ #vibes',
+    caption: caption || 'New vibe published on HY 🇳🇬✨ #vibes',
     videoUrl,
     thumbnailUrl: thumbnailUrl || 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=800&auto=format&fit=crop&q=80',
     duration: typeof duration === 'number' && duration > 0 ? duration : 15,
@@ -1231,7 +1550,7 @@ app.post('/api/videos/upload', (req, res) => {
     updated_at: now,
     createdAt: now,
     privacy: effectiveVisibility,
-    hashtags: hashtags.length > 0 ? hashtags : ['vibetok', 'trending'],
+    hashtags: hashtags.length > 0 ? hashtags : ['hy', 'trending'],
     soundId: soundId || 's-1',
     likesCount: 0,
     commentsCount: 0,
@@ -1282,26 +1601,512 @@ app.post('/api/notifications/read-all', (req, res) => {
   res.json({ success: true });
 });
 
-// Messages Placeholder API
+// =============================================================
+// PHASE 7: REAL-TIME MESSAGING API SUITE
+// =============================================================
+
+function enrichMessage(msg: DBMessage) {
+  const sharedVideo = msg.sharedVideoId
+    ? videos.find((v) => v.id === msg.sharedVideoId)
+    : undefined;
+  const sharedProfile = msg.sharedUserId
+    ? users.find((u) => u.id === msg.sharedUserId)
+    : undefined;
+
+  return {
+    id: msg.id,
+    conversationId: msg.conversationId,
+    senderId: msg.senderId,
+    recipientId: msg.recipientId,
+    text: msg.text,
+    sentAt: msg.sentAt,
+    read: msg.read,
+    readAt: msg.readAt,
+    type: msg.type || 'text',
+    sharedVideo: sharedVideo ? enrichVideo(sharedVideo) : undefined,
+    sharedProfile,
+    reactions: msg.reactions || {},
+    status: msg.status || (msg.read ? 'read' : 'delivered'),
+  };
+}
+
+function enrichConversation(c: DBMessageConversation, activeUserId: string) {
+  const otherUserId = c.participantIds.find((id) => id !== activeUserId) || c.participantIds[0];
+  const otherUser = users.find((u) => u.id === otherUserId) || users[0];
+  const isOnline = Boolean(userSockets.has(otherUserId) && userSockets.get(otherUserId)!.size > 0);
+  const lastSeen = userLastSeen.get(otherUserId) || new Date(Date.now() - 3600000 * 2).toISOString();
+  const isBlockedByMe = blockedUsers.some(
+    (b) => b.blockerId === activeUserId && b.blockedId === otherUserId
+  );
+  const isBlockedByThem = blockedUsers.some(
+    (b) => b.blockerId === otherUserId && b.blockedId === activeUserId
+  );
+
+  const unreadCount = c.messages.filter(
+    (m) => m.recipientId === activeUserId && !m.read
+  ).length;
+
+  return {
+    id: c.id,
+    user: otherUser,
+    lastMessage: c.lastMessage,
+    lastMessageAt: c.lastMessageAt,
+    lastSenderId: c.lastSenderId,
+    unreadCount,
+    isOnline,
+    lastSeen,
+    isBlockedByMe,
+    isBlockedByThem,
+    createdAt: c.createdAt,
+    messages: c.messages.map(enrichMessage),
+  };
+}
+
+// 1. Get all conversations for current authenticated user
 app.get('/api/messages', (req, res) => {
-  if (!currentUserId) {
-    return res.json({ conversations: [] });
+  const activeUserId = (req.headers['x-user-id'] as string) || currentUserId;
+  if (!activeUserId) {
+    return res.json({ conversations: [], totalUnread: 0 });
   }
 
-  const enriched = conversations.map((c) => {
-    const otherUserId = c.participantIds.find((id) => id !== currentUserId) || c.participantIds[0];
-    const otherUser = users.find((u) => u.id === otherUserId) || users[0];
-    return {
-      id: c.id,
-      user: otherUser,
-      lastMessage: c.lastMessage,
-      lastMessageAt: c.lastMessageAt,
-      unreadCount: 0,
-      messages: c.messages,
-    };
+  const userConversations = conversations.filter((c) =>
+    c.participantIds.includes(activeUserId)
+  );
+
+  // Sort by latest message descending
+  userConversations.sort(
+    (a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
+  );
+
+  const enriched = userConversations.map((c) => enrichConversation(c, activeUserId));
+  const totalUnread = enriched.reduce((sum, c) => sum + c.unreadCount, 0);
+
+  res.json({ conversations: enriched, totalUnread });
+});
+
+// 2. Unread messages count (lightweight polling / badge update)
+app.get('/api/messages/unread-count', (req, res) => {
+  const activeUserId = (req.headers['x-user-id'] as string) || currentUserId;
+  if (!activeUserId) {
+    return res.json({ unreadCount: 0 });
+  }
+
+  let unreadCount = 0;
+  for (const c of conversations) {
+    if (c.participantIds.includes(activeUserId)) {
+      unreadCount += c.messages.filter((m) => m.recipientId === activeUserId && !m.read).length;
+    }
+  }
+
+  res.json({ unreadCount });
+});
+
+// 3. Get single conversation (with strict authorization check)
+app.get('/api/messages/:conversationId', (req, res) => {
+  const activeUserId = (req.headers['x-user-id'] as string) || currentUserId;
+  if (!activeUserId) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const c = conversations.find((conv) => conv.id === req.params.conversationId);
+  if (!c) {
+    return res.status(404).json({ error: 'Conversation not found' });
+  }
+
+  // Security Authorization: user must be a participant
+  if (!c.participantIds.includes(activeUserId)) {
+    return res.status(403).json({ error: 'Access denied: You are not a participant in this conversation.' });
+  }
+
+  res.json({ conversation: enrichConversation(c, activeUserId) });
+});
+
+// 4. Send Message (with authorization, rate limits, validation, abuse protection & WS broadcast)
+app.post('/api/messages/:conversationId', (req, res) => {
+  const activeUserId = (req.headers['x-user-id'] as string) || currentUserId;
+  if (!activeUserId) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const c = conversations.find((conv) => conv.id === req.params.conversationId);
+  if (!c) {
+    return res.status(404).json({ error: 'Conversation not found' });
+  }
+
+  // Authorization check
+  if (!c.participantIds.includes(activeUserId)) {
+    return res.status(403).json({ error: 'Access denied: You are not a participant in this conversation.' });
+  }
+
+  const recipientId = c.participantIds.find((id) => id !== activeUserId) || activeUserId;
+
+  // Abuse Protection: Check if blocked in either direction
+  const isBlocked = blockedUsers.some(
+    (b) =>
+      (b.blockerId === activeUserId && b.blockedId === recipientId) ||
+      (b.blockerId === recipientId && b.blockedId === activeUserId)
+  );
+  if (isBlocked) {
+    return res.status(403).json({ error: 'Cannot send message. Messaging is disabled due to a block between these accounts.' });
+  }
+
+  // Rate Limiting: Max 30 messages per minute
+  if (!checkRateLimit(activeUserId)) {
+    return res.status(429).json({ error: 'Rate limit exceeded: You are sending messages too quickly. Please pause for a moment.' });
+  }
+
+  const { text, type = 'text', sharedVideoId, sharedUserId } = req.body;
+  const cleanText = (text || '').trim();
+
+  // Message Validation
+  if (type === 'text' && !cleanText) {
+    return res.status(400).json({ error: 'Message text cannot be empty.' });
+  }
+  if (cleanText.length > 1000) {
+    return res.status(400).json({ error: 'Message cannot exceed 1000 characters.' });
+  }
+
+  const now = new Date().toISOString();
+  const newMsg: DBMessage = {
+    id: `m-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    conversationId: c.id,
+    senderId: activeUserId,
+    recipientId,
+    text: cleanText,
+    sentAt: now,
+    read: false,
+    type,
+    sharedVideoId,
+    sharedUserId,
+    reactions: {},
+    status: 'delivered',
+  };
+
+  c.messages.push(newMsg);
+  c.lastMessage =
+    type === 'video'
+      ? '🎬 Shared a video'
+      : type === 'profile'
+      ? '👤 Shared a creator profile'
+      : cleanText;
+  c.lastMessageAt = now;
+  c.lastSenderId = activeUserId;
+
+  const enrichedMsg = enrichMessage(newMsg);
+
+  // Real-time WebSocket dispatch to recipient
+  sendToUser(recipientId, {
+    type: 'new_message',
+    conversationId: c.id,
+    message: enrichedMsg,
   });
 
-  res.json({ conversations: enriched });
+  // Echo to sender's other tabs
+  sendToUser(activeUserId, {
+    type: 'message_echo',
+    conversationId: c.id,
+    message: enrichedMsg,
+  });
+
+  res.status(201).json({
+    message: enrichedMsg,
+    conversation: enrichConversation(c, activeUserId),
+  });
+});
+
+// 5. Start conversation with a user (or retrieve existing)
+app.post('/api/messages/start', (req, res) => {
+  const activeUserId = (req.headers['x-user-id'] as string) || currentUserId;
+  if (!activeUserId) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const { targetUserId, initialText, sharedVideoId, sharedUserId } = req.body;
+  if (!targetUserId) {
+    return res.status(400).json({ error: 'Target user ID is required' });
+  }
+  if (targetUserId === activeUserId) {
+    return res.status(400).json({ error: 'Cannot start a conversation with yourself' });
+  }
+
+  const targetUser = users.find((u) => u.id === targetUserId);
+  if (!targetUser) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  // Check block
+  const isBlocked = blockedUsers.some(
+    (b) =>
+      (b.blockerId === activeUserId && b.blockedId === targetUserId) ||
+      (b.blockerId === targetUserId && b.blockedId === activeUserId)
+  );
+  if (isBlocked) {
+    return res.status(403).json({ error: 'Cannot start conversation. One of the accounts is blocked.' });
+  }
+
+  let conv = conversations.find(
+    (c) => c.participantIds.includes(activeUserId) && c.participantIds.includes(targetUserId)
+  );
+
+  const now = new Date().toISOString();
+
+  if (!conv) {
+    conv = {
+      id: `conv-${Date.now()}`,
+      participantIds: [activeUserId, targetUserId],
+      lastMessage: initialText || (sharedVideoId ? '🎬 Shared a video' : 'Started conversation'),
+      lastMessageAt: now,
+      lastSenderId: activeUserId,
+      createdAt: now,
+      messages: [],
+    };
+    conversations.unshift(conv);
+  }
+
+  // If initial content provided, add message
+  if (initialText || sharedVideoId || sharedUserId) {
+    const msgType = sharedVideoId ? 'video' : sharedUserId ? 'profile' : 'text';
+    const newMsg: DBMessage = {
+      id: `m-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      conversationId: conv.id,
+      senderId: activeUserId,
+      recipientId: targetUserId,
+      text: (initialText || '').trim(),
+      sentAt: now,
+      read: false,
+      type: msgType,
+      sharedVideoId,
+      sharedUserId,
+      reactions: {},
+      status: 'delivered',
+    };
+    conv.messages.push(newMsg);
+    conv.lastMessage =
+      msgType === 'video'
+        ? '🎬 Shared a video'
+        : msgType === 'profile'
+        ? '👤 Shared a creator profile'
+        : (initialText || '').trim();
+    conv.lastMessageAt = now;
+    conv.lastSenderId = activeUserId;
+
+    // Dispatch via WS
+    sendToUser(targetUserId, {
+      type: 'new_message',
+      conversationId: conv.id,
+      message: enrichMessage(newMsg),
+    });
+  }
+
+  res.json({ conversation: enrichConversation(conv, activeUserId) });
+});
+
+// 6. Mark conversation messages as read
+app.post('/api/messages/:conversationId/read', (req, res) => {
+  const activeUserId = (req.headers['x-user-id'] as string) || currentUserId;
+  if (!activeUserId) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const c = conversations.find((conv) => conv.id === req.params.conversationId);
+  if (!c) {
+    return res.status(404).json({ error: 'Conversation not found' });
+  }
+
+  if (!c.participantIds.includes(activeUserId)) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
+  const now = new Date().toISOString();
+  let updatedCount = 0;
+  const otherUserId = c.participantIds.find((id) => id !== activeUserId) || '';
+
+  c.messages.forEach((m) => {
+    if (m.recipientId === activeUserId && !m.read) {
+      m.read = true;
+      m.readAt = now;
+      m.status = 'read';
+      updatedCount++;
+    }
+  });
+
+  if (updatedCount > 0 && otherUserId) {
+    // Notify sender that recipient read their messages
+    sendToUser(otherUserId, {
+      type: 'read_receipt',
+      conversationId: c.id,
+      readerId: activeUserId,
+      readAt: now,
+    });
+  }
+
+  res.json({ success: true, updatedCount });
+});
+
+// 7. Message Emoji Reaction Toggle
+app.post('/api/messages/:conversationId/reaction', (req, res) => {
+  const activeUserId = (req.headers['x-user-id'] as string) || currentUserId;
+  if (!activeUserId) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const c = conversations.find((conv) => conv.id === req.params.conversationId);
+  if (!c || !c.participantIds.includes(activeUserId)) {
+    return res.status(403).json({ error: 'Access denied or conversation not found' });
+  }
+
+  const { messageId, emoji } = req.body;
+  if (!messageId || !emoji) {
+    return res.status(400).json({ error: 'messageId and emoji are required' });
+  }
+
+  const msg = c.messages.find((m) => m.id === messageId);
+  if (!msg) {
+    return res.status(404).json({ error: 'Message not found' });
+  }
+
+  if (!msg.reactions) msg.reactions = {};
+  const currentList = msg.reactions[emoji] || [];
+
+  if (currentList.includes(activeUserId)) {
+    msg.reactions[emoji] = currentList.filter((uid) => uid !== activeUserId);
+    if (msg.reactions[emoji].length === 0) {
+      delete msg.reactions[emoji];
+    }
+  } else {
+    msg.reactions[emoji] = [...currentList, activeUserId];
+  }
+
+  const otherUserId = c.participantIds.find((id) => id !== activeUserId) || '';
+  if (otherUserId) {
+    sendToUser(otherUserId, {
+      type: 'reaction_update',
+      conversationId: c.id,
+      messageId: msg.id,
+      reactions: msg.reactions,
+    });
+  }
+
+  res.json({ success: true, reactions: msg.reactions });
+});
+
+// 8. Typing indicator HTTP fallback
+app.post('/api/messages/:conversationId/typing', (req, res) => {
+  const activeUserId = (req.headers['x-user-id'] as string) || currentUserId;
+  if (!activeUserId) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const c = conversations.find((conv) => conv.id === req.params.conversationId);
+  if (!c || !c.participantIds.includes(activeUserId)) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
+  const otherUserId = c.participantIds.find((id) => id !== activeUserId) || '';
+  if (otherUserId) {
+    sendToUser(otherUserId, {
+      type: 'typing',
+      conversationId: c.id,
+      senderId: activeUserId,
+      isTyping: Boolean(req.body.isTyping),
+    });
+  }
+
+  res.json({ success: true });
+});
+
+// 9. Block / Unblock User
+app.post('/api/users/:userId/block', (req, res) => {
+  const activeUserId = (req.headers['x-user-id'] as string) || currentUserId;
+  if (!activeUserId) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const targetUserId = req.params.userId;
+  if (targetUserId === activeUserId) {
+    return res.status(400).json({ error: 'You cannot block yourself' });
+  }
+
+  const existing = blockedUsers.find(
+    (b) => b.blockerId === activeUserId && b.blockedId === targetUserId
+  );
+  if (!existing) {
+    blockedUsers.push({
+      id: `block-${Date.now()}`,
+      blockerId: activeUserId,
+      blockedId: targetUserId,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  res.json({ success: true, isBlocked: true });
+});
+
+app.post('/api/users/:userId/unblock', (req, res) => {
+  const activeUserId = (req.headers['x-user-id'] as string) || currentUserId;
+  if (!activeUserId) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const targetUserId = req.params.userId;
+  blockedUsers = blockedUsers.filter(
+    (b) => !(b.blockerId === activeUserId && b.blockedId === targetUserId)
+  );
+
+  res.json({ success: true, isBlocked: false });
+});
+
+// 10. List Blocked Users
+app.get('/api/users/blocked', (req, res) => {
+  const activeUserId = (req.headers['x-user-id'] as string) || currentUserId;
+  if (!activeUserId) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const list = blockedUsers
+    .filter((b) => b.blockerId === activeUserId)
+    .map((b) => {
+      const u = users.find((usr) => usr.id === b.blockedId);
+      return {
+        id: b.id,
+        user: u,
+        blockedAt: b.createdAt,
+      };
+    })
+    .filter((b) => Boolean(b.user));
+
+  res.json({ blockedUsers: list });
+});
+
+// 11. Report Conversation or Message
+app.post('/api/messages/report', (req, res) => {
+  const activeUserId = (req.headers['x-user-id'] as string) || currentUserId;
+  if (!activeUserId) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const { conversationId, messageId, targetUserId, reason, details } = req.body;
+  if (!conversationId || !targetUserId || !reason) {
+    return res.status(400).json({ error: 'conversationId, targetUserId, and reason are required' });
+  }
+
+  const report: DBMessageReport = {
+    id: `mrep-${Date.now()}`,
+    conversationId,
+    messageId,
+    reportedBy: activeUserId,
+    targetUserId,
+    reason,
+    details: (details || '').trim().slice(0, 500),
+    createdAt: new Date().toISOString(),
+  };
+
+  messageReports.push(report);
+
+  res.json({
+    success: true,
+    message: 'Report received. Our safety team will review the conversation logs shortly.',
+  });
 });
 
 // Search API
@@ -1706,8 +2511,8 @@ async function start() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[VibeTok] Server running on http://localhost:${PORT}`);
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`[HY] Server running on http://localhost:${PORT}`);
   });
 }
 

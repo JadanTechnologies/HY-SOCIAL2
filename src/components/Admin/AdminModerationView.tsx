@@ -40,16 +40,16 @@ export function AdminModerationView({ onVideoModified }: AdminModerationViewProp
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([
     {
       id: 'log-1',
-      action: 'Dismissed copyright flag on #cyberpunk neon',
+      action: 'Dismissed copyright flag on Lekki Phase 1 studio audio',
       targetId: 'v-2',
-      admin: 'mod_staff',
+      admin: 'hy_safety',
       timestamp: new Date(Date.now() - 3600000).toISOString(),
     },
     {
       id: 'log-2',
-      action: 'Reviewed safety report on dance choreography',
+      action: 'Reviewed safety report on Amapiano footwork challenge',
       targetId: 'v-1',
-      admin: 'mod_staff',
+      admin: 'hy_safety',
       timestamp: new Date(Date.now() - 14400000).toISOString(),
     },
   ]);
@@ -80,7 +80,7 @@ export function AdminModerationView({ onVideoModified }: AdminModerationViewProp
         id: `log-${Date.now()}`,
         action: `${action.toUpperCase()} action applied to report ${reportId} (${rep?.videoCaption || 'video'})`,
         targetId: rep?.videoId || reportId,
-        admin: 'mod_staff',
+        admin: 'hy_safety',
         timestamp: new Date().toISOString(),
       };
       setAuditLogs((prev) => [newLog, ...prev]);

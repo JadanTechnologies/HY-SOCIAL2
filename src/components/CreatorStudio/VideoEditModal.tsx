@@ -180,7 +180,7 @@ export function VideoEditModal({
               <span className="text-[10px] text-slate-500 uppercase font-semibold mr-1">
                 Suggestions:
               </span>
-              {['vibetok', 'trending', 'creator', 'cinematic', 'bts'].map((tag) => (
+              {['hy', 'trending', 'creator', 'afrobeats', 'bts'].map((tag) => (
                 <button
                   type="button"
                   key={tag}

@@ -21,7 +21,7 @@ export function LandingView({
         {/* Badge */}
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-semibold uppercase tracking-wider mb-6">
           <Sparkles className="w-3.5 h-3.5" />
-          <span>VibeTok 1.0 Community Preview</span>
+          <span>HY 1.0 Community Preview</span>
         </div>
 
         {/* Title */}
@@ -80,12 +80,12 @@ export function LandingView({
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex flex-col justify-end p-5 text-left">
               <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-rose-500/80 text-white w-fit mb-2 flex items-center gap-1">
-                <Flame className="w-3 h-3" /> #dance
+                <Flame className="w-3 h-3" /> #amapiano
               </span>
               <h3 className="text-white text-sm font-bold line-clamp-2 leading-snug">
-                Finding stillness inside chaotic choreography at 2 AM
+                Lekki Amapiano footwork challenge drop with Lagos energy
               </h3>
-              <p className="text-xs text-slate-300 mt-1 font-medium">@elena_moves</p>
+              <p className="text-xs text-slate-300 mt-1 font-medium">@amaka_steps</p>
             </div>
           </div>
 
@@ -96,17 +96,17 @@ export function LandingView({
           >
             <img
               src="https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&auto=format&fit=crop&q=80"
-              alt="Cyberpunk Tokyo"
+              alt="Lekki Studio Session"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex flex-col justify-end p-5 text-left">
               <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-cyan-500/80 text-black w-fit mb-2 flex items-center gap-1">
-                <Sparkles className="w-3 h-3" /> #cyberpunk
+                <Sparkles className="w-3 h-3" /> #afrobeats
               </span>
               <h3 className="text-white text-sm font-bold line-clamp-2 leading-snug">
-                Cyberpunk rain reflections in Shinjuku alleys
+                Producing an Afrobeats banger live in Lekki Phase 1
               </h3>
-              <p className="text-xs text-slate-300 mt-1 font-medium">@cyber_kai</p>
+              <p className="text-xs text-slate-300 mt-1 font-medium">@tunde_soundz</p>
             </div>
           </div>
 
@@ -117,17 +117,17 @@ export function LandingView({
           >
             <img
               src="https://images.unsplash.com/photo-1520045892732-304bc3ac5d8e?w=600&auto=format&fit=crop&q=80"
-              alt="Skate Session"
+              alt="Lagos Skate Session"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex flex-col justify-end p-5 text-left">
               <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-amber-500/80 text-black w-fit mb-2 flex items-center gap-1">
-                <Flame className="w-3 h-3" /> #skate
+                <Flame className="w-3 h-3" /> #lagos
               </span>
               <h3 className="text-white text-sm font-bold line-clamp-2 leading-snug">
-                Sunset kickflip down the 6-stair at Venice Beach
+                Skating Marina and dodging Danfo buses in Lagos Island
               </h3>
-              <p className="text-xs text-slate-300 mt-1 font-medium">@skate_sam</p>
+              <p className="text-xs text-slate-300 mt-1 font-medium">@emeka_skates</p>
             </div>
           </div>
         </div>
@@ -140,7 +140,7 @@ export function LandingView({
             </div>
             <h4 className="text-white font-bold text-base">Uncompressed Sound</h4>
             <p className="text-slate-400 text-sm mt-2 leading-relaxed">
-              Experience modular synth loops, original beats, and binaural audio recorded directly by creators.
+              Experience Afrobeats rhythms, original Naija producer beats, and authentic creator sounds recorded across Lagos and beyond.
             </p>
           </div>
 
@@ -168,7 +168,7 @@ export function LandingView({
 
       {/* Footer */}
       <footer className="border-t border-white/10 py-8 text-center text-xs text-slate-500">
-        <p>VibeTok Phase 1 Foundation · Engineered with React, TypeScript & Express</p>
+        <p>HY Phase 1 Foundation · Engineered with React, TypeScript & Express</p>
       </footer>
     </div>
   );

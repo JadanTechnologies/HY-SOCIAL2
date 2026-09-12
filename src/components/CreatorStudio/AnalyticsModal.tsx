@@ -98,7 +98,7 @@ export function AnalyticsModal({ isOpen, onClose }: AnalyticsModalProps) {
                   <TrendingUp className="w-3.5 h-3.5 text-rose-400" />
                 </div>
                 <p className="text-lg font-bold text-white">{data.avgCompletionRate}%</p>
-                <p className="text-[10px] text-emerald-400 font-semibold mt-1">Top 5% on VibeTok</p>
+                <p className="text-[10px] text-emerald-400 font-semibold mt-1">Top 5% on HY</p>
               </div>
 
               <div className="p-3.5 bg-white/5 rounded-2xl border border-white/5">

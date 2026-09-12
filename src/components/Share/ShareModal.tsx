@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Copy, Check, Share2, Code, QrCode } from 'lucide-react';
+import { X, Copy, Check, Share2, Code, QrCode, MessageSquare } from 'lucide-react';
 import { Video } from '../../types';
 import { api } from '../../services/api';
 
@@ -8,9 +8,10 @@ interface ShareModalProps {
   onClose: () => void;
   video: Video | null;
   onShareCompleted?: () => void;
+  onShareToDM?: (video: Video) => void;
 }
 
-export function ShareModal({ isOpen, onClose, video, onShareCompleted }: ShareModalProps) {
+export function ShareModal({ isOpen, onClose, video, onShareCompleted, onShareToDM }: ShareModalProps) {
   const [copied, setCopied] = useState(false);
   const [showEmbed, setShowEmbed] = useState(false);
 
@@ -33,6 +34,12 @@ export function ShareModal({ isOpen, onClose, video, onShareCompleted }: ShareMo
     api.recordShare(video.id).catch(console.error);
     onShareCompleted?.();
     setTimeout(() => setCopied(false), 2500);
+  };
+
+  const handleSendDM = () => {
+    api.recordShare(video.id).catch(console.error);
+    onClose();
+    onShareToDM?.(video);
   };
 
   return (
@@ -93,6 +100,17 @@ export function ShareModal({ isOpen, onClose, video, onShareCompleted }: ShareMo
               </button>
             </div>
           </div>
+
+          {/* Send via Direct Message */}
+          {onShareToDM && (
+            <button
+              onClick={handleSendDM}
+              className="w-full py-2.5 px-3 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+            >
+              <MessageSquare className="w-4 h-4 text-cyan-400" />
+              <span>Send via Direct Message</span>
+            </button>
+          )}
 
           <div className="pt-2 flex items-center justify-between border-t border-white/5">
             <button

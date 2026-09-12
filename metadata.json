@@ -1,6 +1,6 @@
 {
-  "name": "VibeTok",
-  "description": "Original short-form video platform featuring curated feeds, creator profiles, interactive comments, and seamless playback.",
+  "name": "HY",
+  "description": "Original short-form video platform featuring Nigerian and global creators, Afrobeats rhythms, interactive comments, and seamless playback.",
   "requestFramePermissions": ["camera", "microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

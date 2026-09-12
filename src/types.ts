@@ -7,6 +7,7 @@ export interface User {
   bio: string;
   website?: string;
   verified: boolean;
+  isVerified?: boolean;
   followersCount: number;
   followingCount: number;
   likesCount: number;

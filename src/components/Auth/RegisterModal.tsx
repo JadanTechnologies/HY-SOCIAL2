@@ -82,7 +82,7 @@ export function RegisterModal({
           <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-cyan-500 to-rose-500 text-white mx-auto flex items-center justify-center mb-3 shadow-lg shadow-cyan-500/20">
             <Sparkles className="w-6 h-6" />
           </div>
-          <h2 className="text-2xl font-bold font-brand text-white tracking-tight">Join VibeTok</h2>
+          <h2 className="text-2xl font-bold font-brand text-white tracking-tight">Join HY</h2>
           <p className="text-xs text-slate-400 mt-1">
             Create your account to discover clips, bookmark favorites, and publish.
           </p>

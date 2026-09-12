@@ -54,7 +54,7 @@ export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
 
         <div className="mb-6">
           <h2 className="text-xl font-bold font-brand text-white">Edit Profile</h2>
-          <p className="text-xs text-slate-400 mt-1">Update your creator identity on VibeTok</p>
+          <p className="text-xs text-slate-400 mt-1">Update your creator identity on HY</p>
         </div>
 
         {error && (

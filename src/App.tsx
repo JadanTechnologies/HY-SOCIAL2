@@ -24,12 +24,15 @@ import { CreatorStudioView } from './components/CreatorStudio/CreatorStudioView'
 import { AppRoute, Video } from './types';
 import { api } from './services/api';
 
-function VibeTokMain() {
+function HYMain() {
   const { currentUser, isAuthenticated } = useAuth();
   const [activeRoute, setActiveRoute] = useState<AppRoute>('home');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [targetProfileUsername, setTargetProfileUsername] = useState<string | undefined>(undefined);
   const [unreadCount, setUnreadCount] = useState<number>(1);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
+  const [messagesTargetUser, setMessagesTargetUser] = useState<string | null>(null);
+  const [messagesSharedVideo, setMessagesSharedVideo] = useState<Video | null>(null);
 
   // Modals state
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -46,13 +49,19 @@ function VibeTokMain() {
   const [activeShareVideo, setActiveShareVideo] = useState<Video | null>(null);
   const [activeReportVideo, setActiveReportVideo] = useState<Video | null>(null);
 
-  // Fetch unread notifications count
+  // Fetch unread notifications & messages count
   useEffect(() => {
     if (isAuthenticated) {
       api.getNotifications()
         .then((res) => {
           const unread = res.notifications.filter((n) => !n.read).length;
           setUnreadCount(unread);
+        })
+        .catch(console.error);
+
+      api.getUnreadMessagesCount()
+        .then((res) => {
+          setUnreadMessagesCount(res.unreadCount || 0);
         })
         .catch(console.error);
     }
@@ -94,6 +103,7 @@ function VibeTokMain() {
         onOpenLogin={() => setIsLoginOpen(true)}
         onOpenRegister={() => setIsRegisterOpen(true)}
         unreadNotifsCount={unreadCount}
+        unreadMessagesCount={unreadMessagesCount}
       />
 
       {/* Main View Router */}
@@ -163,6 +173,8 @@ function VibeTokMain() {
             onOpenSettings={() => setActiveRoute('settings')}
             onOpenStudio={() => setActiveRoute('studio')}
             onOpenMessagesWithUser={(user) => {
+              setMessagesTargetUser(user);
+              setMessagesSharedVideo(null);
               setActiveRoute('messages');
             }}
           />
@@ -189,11 +201,14 @@ function VibeTokMain() {
           />
         )}
 
-        {/* Messages Placeholder Structure */}
+        {/* Direct Messages (Phase 7) */}
         {activeRoute === 'messages' && (
           <MessagesView
             onSelectUser={handleSelectUser}
+            onSelectVideo={handleSelectVideo}
             currentUser={currentUser}
+            initialTargetUsername={messagesTargetUser}
+            initialSharedVideo={messagesSharedVideo}
           />
         )}
 
@@ -293,6 +308,12 @@ function VibeTokMain() {
             });
           }
         }}
+        onShareToDM={(vid) => {
+          setActiveShareVideo(null);
+          setMessagesSharedVideo(vid);
+          setMessagesTargetUser(null);
+          setActiveRoute('messages');
+        }}
       />
 
       {/* Report Modal */}
@@ -333,7 +354,7 @@ function VibeTokMain() {
 export default function App() {
   return (
     <AuthProvider>
-      <VibeTokMain />
+      <HYMain />
     </AuthProvider>
   );
 }

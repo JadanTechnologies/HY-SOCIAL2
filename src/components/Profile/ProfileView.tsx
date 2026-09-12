@@ -43,7 +43,7 @@ export function ProfileView({
   onOpenStudio,
   onOpenMessagesWithUser,
 }: ProfileViewProps) {
-  const targetUsername = username || currentUser?.username || 'alex_rivers';
+  const targetUsername = username || currentUser?.username || 'tobi_bakare';
   const isOwnProfile = currentUser?.username.toLowerCase() === targetUsername.toLowerCase();
 
   const [profileUser, setProfileUser] = useState<UserType | null>(null);
@@ -140,7 +140,7 @@ export function ProfileView({
             </div>
 
             <p className="text-xs sm:text-sm text-slate-300 mt-2.5 leading-relaxed max-w-xl">
-              {profileUser.bio || 'Creating original vibes on VibeTok.'}
+              {profileUser.bio || 'Creating original vibes on HY.'}
             </p>
 
             {profileUser.website && (

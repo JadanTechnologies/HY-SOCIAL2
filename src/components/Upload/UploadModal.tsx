@@ -250,7 +250,7 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess }: UploadModalPro
 
     if (!caption) {
       const filenameWithoutExt = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-      setCaption(`${filenameWithoutExt} ✨ #vibetok #vibes`);
+      setCaption(`${filenameWithoutExt} ✨ #hy #vibes`);
       setTitle(filenameWithoutExt);
     }
   };
@@ -432,7 +432,7 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess }: UploadModalPro
             if (uploadAbortRef.current) return;
             setProcessingStage('publishing');
             setProgressPercent(98);
-            setProgressStep('Publishing video record to VibeTok feed...');
+            setProgressStep('Publishing video record to HY feed...');
 
             try {
               const res = await api.uploadVideo({
@@ -453,7 +453,7 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess }: UploadModalPro
               if (uploadAbortRef.current) return;
               setProcessingStage('ready');
               setProgressPercent(100);
-              setProgressStep('Ready! Video is live on VibeTok ✨');
+              setProgressStep('Ready! Video is live on HY ✨');
 
               setTimeout(() => {
                 setIsUploading(false);
@@ -789,7 +789,7 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess }: UploadModalPro
 
                   {/* Tag and Mention quick buttons */}
                   <div className="flex flex-wrap gap-1.5 mt-2">
-                    {['#dance', '#cyberpunk', '#beats', '#skate', '#sunset', '#vibetok'].map((t) => (
+                    {['#afrobeats', '#amapiano', '#lagosvibes', '#jollof', '#skate', '#hy'].map((t) => (
                       <button
                         key={t}
                         type="button"
@@ -799,7 +799,7 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess }: UploadModalPro
                         {t}
                       </button>
                     ))}
-                    {['@elena_moves', '@cyber_kai'].map((m) => (
+                    {['@amaka_steps', '@tunde_soundz', '@kemi_delights'].map((m) => (
                       <button
                         key={m}
                         type="button"

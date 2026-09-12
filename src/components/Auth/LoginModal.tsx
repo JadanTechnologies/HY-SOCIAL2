@@ -44,9 +44,9 @@ export function LoginModal({
   };
 
   // Quick preset helper for testing
-  const handleQuickLogin = (userIdent: string) => {
+  const handleQuickLogin = (userIdent: string, pwd = 'password123') => {
     setIdentifier(userIdent);
-    setPassword('password123');
+    setPassword(pwd);
   };
 
   return (
@@ -68,7 +68,7 @@ export function LoginModal({
           <div className="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 mx-auto flex items-center justify-center mb-3">
             <Lock className="w-6 h-6" />
           </div>
-          <h2 className="text-2xl font-bold font-brand text-white tracking-tight">Log in to VibeTok</h2>
+          <h2 className="text-2xl font-bold font-brand text-white tracking-tight">Log in to HY</h2>
           <p className="text-xs text-slate-400 mt-1">
             Access your feed, follow creators, and share original vibes.
           </p>
@@ -94,7 +94,7 @@ export function LoginModal({
                 type="text"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="alex_rivers or alex@vibetok.app"
+                placeholder="jadan, tobi_bakare, or jadan@hy.app"
                 className="w-full bg-slate-900/90 border border-white/15 rounded-xl px-4 py-2.5 pl-10 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-400 transition-colors"
                 required
               />
@@ -151,24 +151,32 @@ export function LoginModal({
           <span className="text-[11px] font-semibold text-slate-400 block mb-2 text-center uppercase tracking-wider">
             Quick 1-Click Demo Accounts
           </span>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <button
               type="button"
-              onClick={() => handleQuickLogin('alex_rivers')}
-              className="px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-medium text-slate-300 text-center transition-colors"
+              id="quick-login-jadan"
+              onClick={() => handleQuickLogin('jadan', 'jadan')}
+              className="px-2 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-[11px] font-semibold text-cyan-300 text-center transition-colors"
             >
-              Alex (Creator)
+              Jabir (jadan)
             </button>
             <button
               type="button"
-              onClick={() => handleQuickLogin('elena_moves')}
+              onClick={() => handleQuickLogin('tobi_bakare')}
               className="px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-medium text-slate-300 text-center transition-colors"
             >
-              Elena (Dancer)
+              Tobi (Filmmaker)
             </button>
             <button
               type="button"
-              onClick={() => handleQuickLogin('mod_staff')}
+              onClick={() => handleQuickLogin('amaka_steps')}
+              className="px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-medium text-slate-300 text-center transition-colors"
+            >
+              Amaka (Dancer)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickLogin('hy_safety')}
               className="px-2 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-[11px] font-medium text-rose-300 text-center transition-colors"
             >
               Staff (Admin)
