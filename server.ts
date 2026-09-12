@@ -1014,57 +1014,58 @@ app.get('/api/me', (req, res) => {
 
 // Real Authentication: Register
 app.post('/api/auth/register', (req, res) => {
-  const { username, email, password, displayName } = req.body;
+  try {
+    const { username, email, password, displayName } = req.body || {};
 
-  if (!username || !email || !password) {
-    return res.status(400).json({ error: 'Username, email, and password are required' });
-  }
-
-  const cleanUsername = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
-  if (cleanUsername.length < 3) {
-    return res.status(400).json({ error: 'Username must be at least 3 characters long (letters, numbers, underscores)' });
-  }
-
-  const cleanEmail = email.trim().toLowerCase();
-  const existingUser = users.find(
-    (u) => u.username.toLowerCase() === cleanUsername || u.email.toLowerCase() === cleanEmail
-  );
-
-  if (existingUser) {
-    if (existingUser.username.toLowerCase() === cleanUsername) {
-      return res.status(409).json({ error: 'Username is already taken' });
+    if (!username || !email || !password) {
+      return res.status(400).json({ error: 'Username, email, and password are required' });
     }
-    return res.status(409).json({ error: 'An account with this email already exists' });
-  }
 
-  const newId = `u-${Date.now()}`;
-  const defaultAvatars = [
-    'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=400&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80',
-  ];
-  const chosenAvatar = defaultAvatars[users.length % defaultAvatars.length];
+    const cleanUsername = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+    if (cleanUsername.length < 3) {
+      return res.status(400).json({ error: 'Username must be at least 3 characters long (letters, numbers, underscores)' });
+    }
 
-  const newUser: DBUser = {
-    id: newId,
-    email: cleanEmail,
-    username: cleanUsername,
-    displayName: displayName?.trim() || cleanUsername,
-    passwordHash: password,
-    avatar: chosenAvatar,
-    bio: 'Creator on HY 🇳🇬✨',
-    verified: false,
-    followersCount: 0,
-    followingCount: 0,
-    likesCount: 0,
-    role: 'user',
-  };
+    const cleanEmail = email.trim().toLowerCase();
+    const existingUser = users.find(
+      (u) => u.username.toLowerCase() === cleanUsername || u.email.toLowerCase() === cleanEmail
+    );
 
-  users.push(newUser);
-  currentUserId = newUser.id;
+    if (existingUser) {
+      if (existingUser.username.toLowerCase() === cleanUsername) {
+        return res.status(409).json({ error: 'Username is already taken' });
+      }
+      return res.status(409).json({ error: 'An account with this email already exists' });
+    }
 
-// Add welcome notification
+    const newId = `u-${Date.now()}`;
+    const defaultAvatars = [
+      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=400&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80',
+    ];
+    const chosenAvatar = defaultAvatars[users.length % defaultAvatars.length];
+
+    const newUser: DBUser = {
+      id: newId,
+      email: cleanEmail,
+      username: cleanUsername,
+      displayName: displayName?.trim() || cleanUsername,
+      passwordHash: password,
+      avatar: chosenAvatar,
+      bio: 'Creator on HY 🇳🇬✨',
+      verified: false,
+      followersCount: 0,
+      followingCount: 0,
+      likesCount: 0,
+      role: 'user',
+    };
+
+    users.push(newUser);
+    currentUserId = newUser.id;
+
+    // Add welcome notification
     notifications.unshift({
       id: `notif-${Date.now()}`,
       recipientId: newUser.id,
@@ -1075,44 +1076,56 @@ app.post('/api/auth/register', (req, res) => {
       createdAt: new Date().toISOString(),
     });
 
-  res.status(201).json({
-    success: true,
-    user: newUser,
-  });
+    // Return user without passwordHash
+    const { passwordHash: _pw, ...userSafe } = newUser;
+    res.status(201).json({
+      success: true,
+      user: userSafe,
+    });
+  } catch (err) {
+    console.error('[Register] Error:', err);
+    res.status(500).json({ error: 'Registration failed. Please try again.' });
+  }
 });
 
 // Real Authentication: Login
 app.post('/api/auth/login', (req, res) => {
-  const { identifier, password } = req.body;
-  if (!identifier || !password) {
-    return res.status(400).json({ error: 'Username/email and password are required' });
+  try {
+    const { identifier, password } = req.body || {};
+    if (!identifier || !password) {
+      return res.status(400).json({ error: 'Username/email and password are required' });
+    }
+
+    const cleanIdent = identifier.trim().toLowerCase();
+    const user = users.find(
+      (u) => u.username.toLowerCase() === cleanIdent || u.email.toLowerCase() === cleanIdent
+    );
+
+    if (!user) {
+      return res.status(401).json({ error: 'Account not found with provided username or email' });
+    }
+
+    // Check password (allow default match or fallback for demo)
+    if (user.passwordHash && user.passwordHash !== password && password !== 'password123') {
+      return res.status(401).json({ error: 'Incorrect password. Please try again or use Forgot Password.' });
+    }
+
+    currentUserId = user.id;
+
+    const { passwordHash: _pw, ...userSafe } = user;
+    res.json({
+      success: true,
+      user: {
+        ...userSafe,
+        followingCount: userFollows.size,
+        likedVideosCount: userLikes.size,
+        savedVideosCount: userSaves.size,
+      },
+    });
+  } catch (err) {
+    console.error('[Login] Error:', err);
+    res.status(500).json({ error: 'Login failed. Please try again.' });
   }
-
-  const cleanIdent = identifier.trim().toLowerCase();
-  const user = users.find(
-    (u) => u.username.toLowerCase() === cleanIdent || u.email.toLowerCase() === cleanIdent
-  );
-
-  if (!user) {
-    return res.status(401).json({ error: 'Account not found with provided username or email' });
-  }
-
-  // Check password (allow default match or fallback for demo)
-  if (user.passwordHash && user.passwordHash !== password && password !== 'password123') {
-    return res.status(401).json({ error: 'Incorrect password. Please try again or use Forgot Password.' });
-  }
-
-  currentUserId = user.id;
-
-  res.json({
-    success: true,
-    user: {
-      ...user,
-      followingCount: userFollows.size,
-      likedVideosCount: userLikes.size,
-      savedVideosCount: userSaves.size,
-    },
-  });
 });
 
 // Real Authentication: Logout
