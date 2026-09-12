@@ -343,7 +343,6 @@ export function VideoItem({
     >
       {/* Responsive Container: Mobile full screen, Desktop framed with companion layout */}
       <div className="relative w-full h-full md:max-w-[420px] lg:max-w-[450px] md:h-[calc(100vh-5rem)] md:rounded-2xl overflow-hidden bg-black shadow-2xl border border-white/5 flex items-center justify-center">
-        
         {/* HTML5 Video Element */}
         <video
           ref={videoRef}

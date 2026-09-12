@@ -151,7 +151,7 @@ export function LoginModal({
           <span className="text-[11px] font-semibold text-slate-400 block mb-2 text-center uppercase tracking-wider">
             Quick 1-Click Demo Accounts
           </span>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             <button
               type="button"
               id="quick-login-jadan"
@@ -176,10 +176,24 @@ export function LoginModal({
             </button>
             <button
               type="button"
-              onClick={() => handleQuickLogin('hy_safety')}
-              className="px-2 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-[11px] font-medium text-rose-300 text-center transition-colors"
+              onClick={() => handleQuickLogin('tunde_soundz')}
+              className="px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-medium text-slate-300 text-center transition-colors"
             >
-              Staff (Admin)
+              Tunde (Producer)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickLogin('kemi_delights')}
+              className="px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-medium text-slate-300 text-center transition-colors"
+            >
+              Kemi (Chef)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickLogin('emeka_skates')}
+              className="px-2 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-medium text-slate-300 text-center transition-colors"
+            >
+              Emeka (Skater)
             </button>
           </div>
         </div>

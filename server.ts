@@ -38,7 +38,7 @@ interface DBUser {
   followersCount: number;
   followingCount: number;
   likesCount: number;
-  role: 'user' | 'creator' | 'admin';
+  role: 'user' | 'creator';
 }
 
 interface DBSound {
@@ -249,20 +249,6 @@ const users: DBUser[] = [
     followingCount: 195,
     likesCount: 1950000,
     role: 'creator',
-  },
-  {
-    id: 'u-admin',
-    email: 'admin@hy.app',
-    username: 'hy_safety',
-    displayName: 'HY Trust & Safety Nigeria',
-    passwordHash: 'admin123',
-    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80',
-    bio: 'Official HY platform operations & creator community moderation for Nigeria & Africa 🛡️🇳🇬',
-    verified: true,
-    followersCount: 45200,
-    followingCount: 12,
-    likesCount: 185000,
-    role: 'admin',
   },
 ];
 
@@ -666,7 +652,7 @@ let notifications: DBNotification[] = [
   {
     id: 'notif-4',
     recipientId: 'u-current',
-    actorId: 'u-admin',
+    actorId: 'u-1',
     type: 'system',
     text: 'Welcome to HY Nigeria! Your creator profile is verified and ready to share vibes.',
     read: true,
@@ -1078,16 +1064,16 @@ app.post('/api/auth/register', (req, res) => {
   users.push(newUser);
   currentUserId = newUser.id;
 
-  // Add welcome notification
-  notifications.unshift({
-    id: `notif-${Date.now()}`,
-    recipientId: newUser.id,
-    actorId: 'u-admin',
-    type: 'system',
-    text: `Welcome to HY, @${newUser.username}! Discover top Nigerian creators or share your first vibe.`,
-    read: false,
-    createdAt: new Date().toISOString(),
-  });
+// Add welcome notification
+    notifications.unshift({
+      id: `notif-${Date.now()}`,
+      recipientId: newUser.id,
+      actorId: 'u-1',
+      type: 'system',
+      text: `Welcome to HY, @${newUser.username}! Discover top Nigerian creators or share your first vibe.`,
+      read: false,
+      createdAt: new Date().toISOString(),
+    });
 
   res.status(201).json({
     success: true,
@@ -2170,49 +2156,6 @@ app.post('/api/reports', (req, res) => {
   res.json({ success: true, report: newReport });
 });
 
-// Admin Moderation API
-app.get('/api/admin/reports', (req, res) => {
-  const enrichedReports = reports.map((r) => {
-    const video = videos.find((v) => v.id === r.videoId);
-    const author = video ? users.find((u) => u.id === video.authorId) : null;
-    return {
-      ...r,
-      videoCaption: video ? video.caption : '[Video Deleted]',
-      authorUsername: author ? author.username : 'unknown',
-      isTakenDown: video ? Boolean(video.isTakenDown) : true,
-    };
-  });
-  res.json({
-    reports: enrichedReports,
-    metrics: {
-      totalVideos: videos.length,
-      activeUsers: users.length,
-      pendingReports: reports.filter((r) => r.status === 'pending').length,
-      totalViews: videos.reduce((acc, v) => acc + v.viewsCount, 0),
-    },
-  });
-});
-
-app.post('/api/admin/reports/:id/action', (req, res) => {
-  const { action } = req.body;
-  const report = reports.find((r) => r.id === req.params.id);
-  if (!report) return res.status(404).json({ error: 'Report not found' });
-
-  const video = videos.find((v) => v.id === report.videoId);
-
-  if (action === 'take_down' && video) {
-    video.isTakenDown = true;
-    report.status = 'resolved';
-  } else if (action === 'dismiss') {
-    report.status = 'dismissed';
-  } else if (action === 'reinstate' && video) {
-    video.isTakenDown = false;
-    report.status = 'resolved';
-  }
-
-  res.json({ success: true, report, isTakenDown: video?.isTakenDown });
-});
-
 // Creator Studio Dashboard & Analytics
 app.get('/api/creator/dashboard', (req, res) => {
   const targetId = currentUserId || 'u-current';
@@ -2408,9 +2351,9 @@ app.patch('/api/creator/videos/:id', (req, res) => {
     return res.status(404).json({ error: 'Video not found' });
   }
 
-  // In demo environment, allow editing if current user is owner or admin
-  if (video.authorId !== targetId && currentUserId !== 'u-admin') {
-    video.authorId = targetId; // Reassign for testing flexibility
+  // In demo environment, allow editing if current user is owner
+  if (video.authorId !== targetId) {
+    return res.status(403).json({ error: 'You can only edit your own videos' });
   }
 
   const { title, caption, privacy } = req.body;

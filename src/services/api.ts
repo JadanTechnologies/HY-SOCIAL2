@@ -573,25 +573,6 @@ export const api = {
     return res.json();
   },
 
-  async getAdminReports(): Promise<{
-    reports: (ReportItem & { isTakenDown: boolean })[];
-    metrics: { totalVideos: number; activeUsers: number; pendingReports: number; totalViews: number };
-  }> {
-    const res = await fetch('/api/admin/reports');
-    if (!res.ok) throw new Error('Failed to fetch admin reports');
-    return res.json();
-  },
-
-  async takeModerationAction(reportId: string, action: 'take_down' | 'dismiss' | 'reinstate'): Promise<{ success: boolean }> {
-    const res = await fetch(`/api/admin/reports/${reportId}/action`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action }),
-    });
-    if (!res.ok) throw new Error('Failed to perform moderation action');
-    return res.json();
-  },
-
   // Creator Analytics
   async getCreatorAnalytics(): Promise<CreatorAnalytics> {
     const res = await fetch('/api/creator/analytics');

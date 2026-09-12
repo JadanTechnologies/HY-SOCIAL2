@@ -9,7 +9,7 @@ export interface DBUserEntity {
   username: string; // Unique Index, lowercase
   displayName: string;
   passwordHash: string;
-  role: 'user' | 'creator' | 'admin';
+  role: 'user' | 'creator';
   status: 'active' | 'suspended' | 'deactivated';
   createdAt: string; // ISO 8601
   updatedAt: string;

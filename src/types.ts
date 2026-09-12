@@ -11,7 +11,7 @@ export interface User {
   followersCount: number;
   followingCount: number;
   likesCount: number;
-  role: 'user' | 'creator' | 'admin';
+  role: 'user' | 'creator';
   isFollowing?: boolean;
 }
 
@@ -232,7 +232,6 @@ export type AppRoute =
   | 'profile'
   | 'upload'
   | 'settings'
-  | 'admin'
   | 'studio'
   | 'login'
   | 'register'

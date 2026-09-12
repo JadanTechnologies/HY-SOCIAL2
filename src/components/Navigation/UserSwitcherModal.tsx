@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Check, Shield, User, Sparkles } from 'lucide-react';
+import { X, Check, User, Sparkles } from 'lucide-react';
 import { User as UserType } from '../../types';
 import { api } from '../../services/api';
 
@@ -61,7 +61,7 @@ export function UserSwitcherModal({
             </div>
             <div>
               <h3 className="font-brand text-lg font-bold text-white">Switch Active Account</h3>
-              <p className="text-xs text-gray-400">Test different platform roles & creator feeds</p>
+              <p className="text-xs text-gray-400">Test different creator accounts & feeds</p>
             </div>
           </div>
           <button
@@ -101,11 +101,7 @@ export function UserSwitcherModal({
                     <div>
                       <div className="flex items-center gap-1.5">
                         <span className="font-semibold text-sm">{u.displayName}</span>
-                        {u.role === 'admin' ? (
-                          <span className="bg-rose-500/20 text-rose-300 text-[10px] font-bold px-1.5 py-0.5 rounded border border-rose-500/30 flex items-center gap-0.5">
-                            <Shield className="w-2.5 h-2.5" /> Staff
-                          </span>
-                        ) : u.role === 'creator' ? (
+                        {u.role === 'creator' ? (
                           <span className="bg-cyan-500/20 text-cyan-300 text-[10px] font-bold px-1.5 py-0.5 rounded border border-cyan-500/30">
                             Creator
                           </span>

@@ -1,0 +1,25 @@
+{
+  "name": "HY - Short-Form Video Community",
+  "short_name": "HY",
+  "description": "Original short-form video platform featuring Nigerian and global creators, Afrobeats rhythms, interactive comments, and seamless playback.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#070a0f",
+  "theme_color": "#070a0f",
+  "orientation": "portrait",
+  "categories": ["social", "entertainment", "video"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

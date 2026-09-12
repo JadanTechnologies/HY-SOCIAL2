@@ -9,7 +9,6 @@ import { ProfileView } from './components/Profile/ProfileView';
 import { NotificationsView } from './components/Notifications/NotificationsView';
 import { MessagesView } from './components/Messages/MessagesView';
 import { SettingsView } from './components/Settings/SettingsView';
-import { AdminModerationView } from './components/Admin/AdminModerationView';
 import { LoginModal } from './components/Auth/LoginModal';
 import { RegisterModal } from './components/Auth/RegisterModal';
 import { ForgotPasswordModal } from './components/Auth/ForgotPasswordModal';
@@ -221,11 +220,6 @@ function HYMain() {
             onOpenUserSwitcher={() => setIsUserSwitcherOpen(true)}
             onOpenStudio={() => setActiveRoute('studio')}
           />
-        )}
-
-        {/* Admin Moderation View */}
-        {activeRoute === 'admin' && (
-          <AdminModerationView />
         )}
       </main>
 

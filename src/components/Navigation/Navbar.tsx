@@ -4,7 +4,6 @@ import {
   Compass,
   PlusSquare,
   User,
-  Shield,
   BarChart3,
   Search,
   Sparkles,
@@ -252,19 +251,6 @@ export function Navbar({
                     <Settings className="w-3.5 h-3.5 text-slate-400" />
                     <span>Settings</span>
                   </button>
-
-                  {currentUser.role === 'admin' && (
-                    <button
-                      onClick={() => {
-                        setActiveRoute('admin');
-                        setUserDropdownOpen(false);
-                      }}
-                      className="w-full text-left px-3.5 py-2 hover:bg-rose-500/10 flex items-center gap-2 text-rose-300"
-                    >
-                      <Shield className="w-3.5 h-3.5 text-rose-400" />
-                      <span>Admin Moderation</span>
-                    </button>
-                  )}
 
                   <div className="my-1 border-t border-white/10"></div>
 
