@@ -19,9 +19,19 @@ import {
   MessageCircle,
   Layers,
   XCircle,
+  Play,
+  Pause,
+  Volume2,
+  VolumeX,
+  Mic,
+  MicOff,
+  SwitchCamera,
+  RefreshCw,
 } from 'lucide-react';
 import { Video, Sound } from '../../types';
 import { api } from '../../services/api';
+import { toastSound } from '../../services/toastSound';
+import { useToast } from '../../context/ToastContext';
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -80,8 +90,10 @@ const ALLOWED_MIME_TYPES = [
 ];
 
 export function UploadModal({ isOpen, onClose, onUploadSuccess }: UploadModalProps) {
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'upload' | 'record'>('upload');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [videoSource, setVideoSource] = useState<string>('');
   const [thumbnailSource, setThumbnailSource] = useState<string>(COVER_OPTIONS[0]);
   const [videoDuration, setVideoDuration] = useState<number>(15);
@@ -116,12 +128,17 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess }: UploadModalPro
 
   // Live Camera Recording state
   const [isRecording, setIsRecording] = useState(false);
-  const [recordedChunks, setRecordedChunks] = useState<Blob[]>([]);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+  const [micEnabled, setMicEnabled] = useState(true);
+  const [isPreviewMuted, setIsPreviewMuted] = useState(true);
+  const [isPreviewPlaying, setIsPreviewPlaying] = useState(true);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const liveVideoRef = useRef<HTMLVideoElement>(null);
   const timerIntervalRef = useRef<any>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
   // References
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -154,38 +171,98 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess }: UploadModalPro
     setRecordingSeconds(0);
   };
 
-  const startCamera = async () => {
+  const startCamera = async (targetFacing: 'user' | 'environment' = facingMode, enableMic: boolean = micEnabled) => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 720 }, height: { ideal: 1280 } },
-        audio: true,
-      });
+      setValidationError(null);
+      if (cameraStream) {
+        cameraStream.getTracks().forEach((t) => t.stop());
+      }
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 720 }, height: { ideal: 1280 }, facingMode: targetFacing },
+          audio: enableMic,
+        });
+      } catch (audioErr) {
+        console.warn('Audio device access error, trying video-only', audioErr);
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 720 }, height: { ideal: 1280 }, facingMode: targetFacing },
+          audio: false,
+        });
+      }
       setCameraStream(stream);
       if (liveVideoRef.current) {
         liveVideoRef.current.srcObject = stream;
+        liveVideoRef.current.play().catch(() => {});
       }
     } catch (err) {
       console.error('Camera access error', err);
-      setValidationError('Unable to access camera or microphone. Please check browser permissions.');
+      setValidationError('Unable to access camera. Please allow camera and microphone permissions, or select "Upload Video" to choose a file.');
+    }
+  };
+
+  const toggleCameraFacing = () => {
+    const nextFacing = facingMode === 'user' ? 'environment' : 'user';
+    setFacingMode(nextFacing);
+    startCamera(nextFacing, micEnabled);
+  };
+
+  const toggleMic = () => {
+    const nextMic = !micEnabled;
+    setMicEnabled(nextMic);
+    if (cameraStream) {
+      cameraStream.getAudioTracks().forEach((track) => {
+        track.enabled = nextMic;
+      });
     }
   };
 
   const handleStartRecording = () => {
-    if (!cameraStream) return;
-    setRecordedChunks([]);
+    if (!cameraStream) {
+      startCamera();
+      return;
+    }
+    chunksRef.current = [];
+    setRecordedBlob(null);
     setValidationError(null);
+
+    // Pick best supported MIME type
+    const mimeCandidates = [
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm',
+      'video/mp4',
+    ];
+    let selectedMime = '';
+    for (const m of mimeCandidates) {
+      if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(m)) {
+        selectedMime = m;
+        break;
+      }
+    }
+
     try {
-      const recorder = new MediaRecorder(cameraStream, { mimeType: 'video/webm' });
+      const options = selectedMime ? { mimeType: selectedMime } : undefined;
+      const recorder = new MediaRecorder(cameraStream, options);
+
       recorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) {
-          setRecordedChunks((prev) => [...prev, e.data]);
+          chunksRef.current.push(e.data);
         }
       };
+
       recorder.onstop = () => {
-        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+        const finalType = recorder.mimeType || selectedMime || 'video/webm';
+        const blob = new Blob(chunksRef.current, { type: finalType });
+        if (blob.size === 0) {
+          setValidationError('Recorded video was empty. Please try again.');
+          return;
+        }
+        setRecordedBlob(blob);
+        setSelectedFile(null);
+        setFileSizeBytes(blob.size);
         const recordedUrl = URL.createObjectURL(blob);
         setVideoSource(recordedUrl);
-        setFileSizeBytes(blob.size);
         extractVideoMetadata(recordedUrl);
         stopCameraStream();
         setActiveTab('upload');
@@ -207,7 +284,7 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess }: UploadModalPro
       }, 1000);
     } catch (err) {
       console.error('Recording initialization error', err);
-      setValidationError('Recording failed to initialize.');
+      setValidationError('Failed to initialize video recorder. You can also upload a video file directly.');
     }
   };
 
@@ -241,6 +318,7 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess }: UploadModalPro
     }
 
     setSelectedFile(file);
+    setRecordedBlob(null);
     setFileSizeBytes(file.size);
     const objectUrl = URL.createObjectURL(file);
     setVideoSource(objectUrl);
@@ -348,6 +426,7 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess }: UploadModalPro
     setValidationError(null);
     setCancelledMessage(null);
     setSelectedFile(null);
+    setRecordedBlob(null);
     setVideoSource(preset.videoUrl);
     setThumbnailSource(preset.thumbnailUrl);
     setCaption(preset.caption);
@@ -432,28 +511,39 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess }: UploadModalPro
             if (uploadAbortRef.current) return;
             setProcessingStage('publishing');
             setProgressPercent(98);
-            setProgressStep('Publishing video record to HY feed...');
+            setProgressStep('Publishing video record to HY feed & local storage...');
 
             try {
-              const res = await api.uploadVideo({
-                title: title.trim() || caption.trim().slice(0, 40) || 'New Vibe',
-                videoUrl: videoSource,
-                thumbnailUrl: thumbnailSource,
-                caption: caption.trim() || 'New vibe drops ✨ #vibes',
-                duration: videoDuration,
-                dimensions: videoDimensions,
-                fileSize: fileSizeBytes,
-                visibility: privacy,
-                soundId,
-                privacy,
-                allowComments,
-                allowDuet,
-              });
+              const res = await api.uploadVideo(
+                {
+                  title: title.trim() || caption.trim().slice(0, 40) || 'New Vibe',
+                  videoUrl: videoSource,
+                  thumbnailUrl: thumbnailSource,
+                  caption: caption.trim() || 'New vibe drops ✨ #vibes',
+                  duration: videoDuration,
+                  dimensions: videoDimensions,
+                  fileSize: fileSizeBytes,
+                  visibility: privacy,
+                  soundId,
+                  privacy,
+                  allowComments,
+                  allowDuet,
+                },
+                recordedBlob || selectedFile || undefined
+              );
 
               if (uploadAbortRef.current) return;
               setProcessingStage('ready');
               setProgressPercent(100);
               setProgressStep('Ready! Video is live on HY ✨');
+
+              // Play toast chime and pop notification
+              toastSound.play('success');
+              showToast({
+                type: 'success',
+                title: 'Video Published!',
+                message: `"${title.trim() || 'Your video'}" is live on the feed and saved in local storage.`,
+              });
 
               setTimeout(() => {
                 setIsUploading(false);
@@ -532,39 +622,49 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess }: UploadModalPro
         )}
 
         {/* Upload Mode Tabs (Upload File vs. Record Live) */}
-        {!videoSource && !isProcessing && (
-          <div className="flex items-center gap-2 mt-4 pb-2">
-            <button
-              type="button"
-              onClick={() => {
-                stopCameraStream();
-                setActiveTab('upload');
-              }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-                activeTab === 'upload'
-                  ? 'bg-cyan-500 text-slate-950 shadow-sm'
-                  : 'bg-white/5 text-slate-400 hover:text-white border border-white/10'
-              }`}
-            >
-              <Film className="w-4 h-4" />
-              <span>Upload Video</span>
-            </button>
+        {!isProcessing && (
+          <div className="flex items-center justify-between mt-4 pb-2 border-b border-white/5">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  stopCameraStream();
+                  setActiveTab('upload');
+                }}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'upload'
+                    ? 'bg-cyan-500 text-slate-950 shadow-sm shadow-cyan-500/20'
+                    : 'bg-white/5 text-slate-400 hover:text-white border border-white/10'
+                }`}
+              >
+                <Film className="w-3.5 h-3.5" />
+                <span>Upload Video</span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('record');
-                startCamera();
-              }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-                activeTab === 'record'
-                  ? 'bg-cyan-500 text-slate-950 shadow-sm'
-                  : 'bg-white/5 text-slate-400 hover:text-white border border-white/10'
-              }`}
-            >
-              <Camera className="w-4 h-4" />
-              <span>Record with Camera</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('record');
+                  if (!cameraStream) {
+                    startCamera();
+                  }
+                }}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'record'
+                    ? 'bg-cyan-500 text-slate-950 shadow-sm shadow-cyan-500/20'
+                    : 'bg-white/5 text-slate-400 hover:text-white border border-white/10'
+                }`}
+              >
+                <Camera className="w-3.5 h-3.5" />
+                <span>Record with Camera</span>
+              </button>
+            </div>
+
+            {videoSource && (
+              <span className="text-[11px] text-cyan-300 font-medium flex items-center gap-1.5 bg-cyan-500/10 px-2.5 py-1 rounded-lg border border-cyan-500/20">
+                {recordedBlob ? '📹 Camera Clip Ready' : selectedFile ? '📁 File Loaded' : '✨ Sample Selected'}
+              </span>
+            )}
           </div>
         )}
 
@@ -617,29 +717,80 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess }: UploadModalPro
               <div className="space-y-4">
                 {videoSource ? (
                   <div className="space-y-3">
-                    <div className="relative aspect-[9/15] max-h-[340px] rounded-2xl overflow-hidden bg-black border border-white/10 mx-auto shadow-lg group">
+                    <div className="relative aspect-[9/15] max-h-[360px] rounded-2xl overflow-hidden bg-black border border-white/10 mx-auto shadow-lg group">
                       <video
                         ref={videoPreviewRef}
                         src={videoSource}
                         loop
                         autoPlay
-                        muted
+                        muted={isPreviewMuted}
                         playsInline
                         className="w-full h-full object-cover"
+                        onPlay={() => setIsPreviewPlaying(true)}
+                        onPause={() => setIsPreviewPlaying(false)}
                       />
+
+                      {/* Top Bar on Preview */}
+                      <div className="absolute top-2 inset-x-2 flex items-center justify-between pointer-events-none">
+                        <span className="px-2 py-1 rounded-lg bg-black/70 backdrop-blur-md text-[10px] text-white/90 border border-white/15 pointer-events-auto">
+                          {recordedBlob ? 'Camera recording' : selectedFile ? selectedFile.name : 'Selected video'}
+                        </span>
+
+                        <div className="flex items-center gap-1.5 pointer-events-auto">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const v = videoPreviewRef.current;
+                              if (v) {
+                                v.muted = !isPreviewMuted;
+                                setIsPreviewMuted(!isPreviewMuted);
+                              }
+                            }}
+                            className="p-1.5 rounded-lg bg-black/70 backdrop-blur-md text-white border border-white/15 hover:bg-white/20 transition-colors cursor-pointer"
+                            title={isPreviewMuted ? 'Unmute preview' : 'Mute preview'}
+                          >
+                            {isPreviewMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setVideoSource('');
+                              setSelectedFile(null);
+                              setRecordedBlob(null);
+                              if (activeTab === 'record') {
+                                startCamera();
+                              }
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-md text-xs text-white border border-white/15 hover:bg-rose-500 transition-colors cursor-pointer"
+                          >
+                            {recordedBlob ? 'Re-record' : 'Change'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Play/Pause Center Tap Area */}
                       <button
                         type="button"
                         onClick={() => {
-                          setVideoSource('');
-                          setSelectedFile(null);
+                          const v = videoPreviewRef.current;
+                          if (v) {
+                            if (v.paused) {
+                              v.play();
+                              setIsPreviewPlaying(true);
+                            } else {
+                              v.pause();
+                              setIsPreviewPlaying(false);
+                            }
+                          }
                         }}
-                        className="absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-md text-xs text-white border border-white/15 hover:bg-rose-500 transition-colors cursor-pointer"
+                        className="absolute inset-0 m-auto w-12 h-12 rounded-full bg-black/50 backdrop-blur-sm text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer border border-white/20"
                       >
-                        Change Video
+                        {isPreviewPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 translate-x-0.5" />}
                       </button>
 
                       {/* Video Specs Badge */}
-                      <div className="absolute bottom-2 left-2 px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-md text-[10px] text-slate-300 border border-white/10 flex items-center gap-2">
+                      <div className="absolute bottom-2 left-2 px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-md text-[10px] text-slate-300 border border-white/10 flex items-center gap-2 pointer-events-none">
                         <span>{videoDuration}s</span>
                         <span>•</span>
                         <span>{videoDimensions.width}x{videoDimensions.height}</span>
@@ -669,52 +820,116 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess }: UploadModalPro
                         className="w-full accent-cyan-400 cursor-pointer"
                       />
                       <p className="text-[10px] text-slate-400">
-                        {isExtractingThumb ? 'Extracting video frame...' : 'Drag slider to capture frame as cover'}
+                        {isExtractingThumb ? 'Extracting video frame...' : 'Drag slider to capture frame as cover poster'}
                       </p>
                     </div>
                   </div>
                 ) : activeTab === 'record' ? (
                   /* Live Camera Recording Interface */
                   <div className="space-y-3">
-                    <div className="relative aspect-[9/15] max-h-[340px] rounded-2xl overflow-hidden bg-black border border-white/15 mx-auto shadow-lg flex items-center justify-center">
-                      <video
-                        ref={liveVideoRef}
-                        autoPlay
-                        playsInline
-                        muted
-                        className="w-full h-full object-cover"
-                      />
+                    <div className="relative aspect-[9/15] max-h-[360px] rounded-2xl overflow-hidden bg-black border border-white/15 mx-auto shadow-lg flex items-center justify-center">
+                      {cameraStream ? (
+                        <>
+                          <video
+                            ref={liveVideoRef}
+                            autoPlay
+                            playsInline
+                            muted
+                            className="w-full h-full object-cover"
+                            style={{
+                              transform: facingMode === 'user' ? 'scaleX(-1)' : 'none',
+                            }}
+                          />
 
-                      {/* Recording Timer Badge */}
-                      {isRecording && (
-                        <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-rose-500/90 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg animate-pulse">
-                          <span className="w-2 h-2 rounded-full bg-white"></span>
-                          <span>00:{recordingSeconds < 10 ? `0${recordingSeconds}` : recordingSeconds}</span>
+                          {/* Top Controls Bar */}
+                          <div className="absolute top-3 inset-x-3 flex items-center justify-between">
+                            {/* Recording Timer Badge */}
+                            {isRecording ? (
+                              <div className="px-3 py-1 rounded-full bg-rose-500/90 backdrop-blur-md text-white text-xs font-bold flex items-center gap-2 shadow-lg animate-pulse">
+                                <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping"></span>
+                                <span>REC 00:{recordingSeconds < 10 ? `0${recordingSeconds}` : recordingSeconds} / 01:00</span>
+                              </div>
+                            ) : (
+                              <div className="px-3 py-1 rounded-full bg-black/60 backdrop-blur-md text-slate-300 text-xs font-medium border border-white/10">
+                                Max 60 seconds
+                              </div>
+                            )}
+
+                            {/* Camera Actions */}
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={toggleMic}
+                                disabled={isRecording}
+                                className={`p-2 rounded-full backdrop-blur-md border text-xs transition-colors cursor-pointer ${
+                                  micEnabled
+                                    ? 'bg-black/60 border-white/15 text-emerald-400 hover:bg-black/80'
+                                    : 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+                                }`}
+                                title={micEnabled ? 'Mute microphone' : 'Unmute microphone'}
+                              >
+                                {micEnabled ? <Mic className="w-3.5 h-3.5" /> : <MicOff className="w-3.5 h-3.5" />}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={toggleCameraFacing}
+                                disabled={isRecording}
+                                className="p-2 rounded-full bg-black/60 backdrop-blur-md border border-white/15 text-slate-200 hover:bg-black/80 text-xs transition-colors cursor-pointer"
+                                title="Switch front/back camera"
+                              >
+                                <SwitchCamera className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Recording Controls */}
+                          <div className="absolute bottom-4 inset-x-0 flex flex-col items-center justify-center gap-2">
+                            {!isRecording ? (
+                              <div className="flex flex-col items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={handleStartRecording}
+                                  className="w-16 h-16 rounded-full border-4 border-white flex items-center justify-center bg-transparent hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-xl"
+                                >
+                                  <span className="w-12 h-12 rounded-full bg-rose-500"></span>
+                                </button>
+                                <span className="text-[11px] text-white/90 font-medium drop-shadow">Tap to Record</span>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={handleStopRecording}
+                                  className="px-5 py-2.5 rounded-full bg-white text-slate-950 text-xs font-bold flex items-center gap-2 shadow-2xl hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                                >
+                                  <StopCircle className="w-4 h-4 text-rose-600" />
+                                  <span>Stop & Review</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="p-6 text-center space-y-4">
+                          <div className="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center mx-auto">
+                            <Camera className="w-7 h-7" />
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-sm font-bold text-white">Camera Access Required</p>
+                            <p className="text-xs text-slate-400 max-w-xs mx-auto">
+                              Record up to 60 seconds directly using your web camera and microphone.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => startCamera()}
+                            className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold transition-all shadow-md shadow-cyan-500/20 cursor-pointer"
+                          >
+                            Enable Camera & Mic
+                          </button>
                         </div>
                       )}
-
-                      {/* Camera Controls */}
-                      <div className="absolute bottom-4 inset-x-0 flex items-center justify-center gap-3">
-                        {!isRecording ? (
-                          <button
-                            type="button"
-                            onClick={handleStartRecording}
-                            className="px-5 py-2.5 rounded-full bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold flex items-center gap-2 shadow-lg cursor-pointer"
-                          >
-                            <span className="w-3 h-3 rounded-full bg-white"></span>
-                            <span>Start Recording</span>
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={handleStopRecording}
-                            className="px-5 py-2.5 rounded-full bg-white text-slate-950 text-xs font-bold flex items-center gap-2 shadow-lg cursor-pointer"
-                          >
-                            <StopCircle className="w-4 h-4 text-rose-500" />
-                            <span>Stop Recording</span>
-                          </button>
-                        )}
-                      </div>
                     </div>
                   </div>
                 ) : (
@@ -725,7 +940,7 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess }: UploadModalPro
                       onDragOver={handleDragOver}
                       onDragLeave={handleDragLeave}
                       onDrop={handleDrop}
-                      className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[200px] ${
+                      className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[220px] ${
                         isDragging
                           ? 'border-cyan-400 bg-cyan-500/10 scale-102'
                           : 'border-white/15 hover:border-cyan-400/50 bg-white/[0.02] hover:bg-white/5'

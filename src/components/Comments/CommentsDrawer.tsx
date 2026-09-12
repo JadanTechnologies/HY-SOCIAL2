@@ -3,6 +3,7 @@ import { X, Send, Heart, MessageCircle, Sparkles } from 'lucide-react';
 import { Comment, User as UserType } from '../../types';
 import { api } from '../../services/api';
 import { formatCount, timeAgo } from '../../utils/formatters';
+import { toastSound } from '../../services/toastSound';
 
 interface CommentsDrawerProps {
   isOpen: boolean;
@@ -69,6 +70,7 @@ export function CommentsDrawer({
     };
 
     setComments((prev) => [tempComment, ...prev]);
+    toastSound.play('pop');
 
     try {
       const real = await api.addComment(videoId, trimmed);

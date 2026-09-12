@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ToastProvider } from './context/ToastContext';
 import { Navbar } from './components/Navigation/Navbar';
 import { LandingView } from './components/Landing/LandingView';
 import { VideoFeed } from './components/Feed/VideoFeed';
@@ -353,8 +354,10 @@ function HYMain() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <HYMain />
-    </AuthProvider>
+    <ToastProvider>
+      <AuthProvider>
+        <HYMain />
+      </AuthProvider>
+    </ToastProvider>
   );
 }
