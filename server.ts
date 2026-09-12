@@ -2450,6 +2450,24 @@ app.get('/api/creator/analytics', (req, res) => {
 });
 
 // -------------------------------------------------------------
+// Global Error Handler - Ensure all errors return JSON
+// -------------------------------------------------------------
+app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('[Server Error]', err);
+  if (req.path.startsWith('/api/')) {
+    return res.status(500).json({ error: 'Internal server error', message: err.message });
+  }
+  next(err);
+});
+
+// -------------------------------------------------------------
+// API 404 Handler - Catch unmatched API routes
+// -------------------------------------------------------------
+app.use('/api/*', (req, res) => {
+  res.status(404).json({ error: 'API endpoint not found', path: req.path });
+});
+
+// -------------------------------------------------------------
 // Vite Server Integration (Middleware for Dev, Static for Prod)
 // -------------------------------------------------------------
 async function start() {

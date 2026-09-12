@@ -2,6 +2,7 @@ import { User, Video, Comment, Sound, ReportItem, CreatorAnalytics, CreatorStudi
 import { localVideoStorage } from './localVideoStorage';
 
 const STORAGE_KEY_AUTH = 'vibetok_auth_session';
+const API_BASE = '/api';
 
 function getAuthHeaders(): HeadersInit {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -17,13 +18,24 @@ function getAuthHeaders(): HeadersInit {
   return headers;
 }
 
+async function safeJson(res: Response): Promise<any> {
+  const text = await res.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    console.error('[API] Non-JSON response:', res.status, text.substring(0, 200));
+    throw new Error(`Server returned invalid response (${res.status}): ${text.substring(0, 100)}`);
+  }
+}
+
 export const api = {
   // Current user & session
   async getMe(): Promise<{ user: User | null; authenticated: boolean }> {
     try {
-      const res = await fetch('/api/me');
+      const res = await fetch(`${API_BASE}/me`);
       if (!res.ok) throw new Error('Failed to fetch user');
-      const data = await res.json();
+      const data = await safeJson(res);
       if (data.authenticated && data.user) {
         localStorage.setItem(STORAGE_KEY_AUTH, JSON.stringify(data.user));
       }
@@ -48,12 +60,12 @@ export const api = {
     password: string;
     displayName?: string;
   }): Promise<{ success: boolean; user: User }> {
-    const res = await fetch('/api/auth/register', {
+    const res = await fetch(`${API_BASE}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok) throw new Error(data.error || 'Registration failed');
     localStorage.setItem(STORAGE_KEY_AUTH, JSON.stringify(data.user));
     return data;
@@ -64,16 +76,18 @@ export const api = {
     password: string;
   }): Promise<{ success: boolean; user: User }> {
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       if (res.ok) {
-        const data = await res.json();
+        const data = await safeJson(res);
         localStorage.setItem(STORAGE_KEY_AUTH, JSON.stringify(data.user));
         return data;
       }
+      const errData = await safeJson(res);
+      throw new Error(errData.error || 'Login failed');
     } catch (err) {
       console.warn('[API] Backend login request error, checking local users', err);
     }
@@ -104,7 +118,7 @@ export const api = {
 
   async logout(): Promise<{ success: boolean }> {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch(`${API_BASE}/auth/logout`, { method: 'POST' });
     } finally {
       localStorage.removeItem(STORAGE_KEY_AUTH);
     }
@@ -112,23 +126,23 @@ export const api = {
   },
 
   async forgotPassword(email: string): Promise<{ success: boolean; message: string }> {
-    const res = await fetch('/api/auth/forgot-password', {
+    const res = await fetch(`${API_BASE}/auth/forgot-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok) throw new Error(data.error || 'Password reset failed');
     return data;
   },
 
   async resetPassword(payload: { email: string; newPassword: string }): Promise<{ success: boolean; message: string }> {
-    const res = await fetch('/api/auth/reset-password', {
+    const res = await fetch(`${API_BASE}/auth/reset-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok) throw new Error(data.error || 'Password update failed');
     return data;
   },
@@ -139,33 +153,33 @@ export const api = {
     avatar?: string;
     website?: string;
   }): Promise<{ success: boolean; user: User }> {
-    const res = await fetch('/api/auth/profile', {
+    const res = await fetch(`${API_BASE}/auth/profile`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok) throw new Error(data.error || 'Profile update failed');
     localStorage.setItem(STORAGE_KEY_AUTH, JSON.stringify(data.user));
     return data;
   },
 
   async switchUser(userId: string): Promise<{ success: boolean; user: User }> {
-    const res = await fetch('/api/auth/switch-user', {
+    const res = await fetch(`${API_BASE}/auth/switch-user`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId }),
     });
     if (!res.ok) throw new Error('Failed to switch user');
-    const data = await res.json();
+    const data = await safeJson(res);
     localStorage.setItem(STORAGE_KEY_AUTH, JSON.stringify(data.user));
     return data;
   },
 
   async getUsers(): Promise<User[]> {
-    const res = await fetch('/api/users');
+    const res = await fetch(`${API_BASE}/users`);
     if (!res.ok) throw new Error('Failed to fetch users');
-    return res.json();
+    return safeJson(res);
   },
 
   async getUserProfile(username: string): Promise<{ user: User; videos: Video[] }> {
@@ -186,9 +200,9 @@ export const api = {
     };
 
     try {
-      const res = await fetch(`/api/users/${encodeURIComponent(username)}`);
+      const res = await fetch(`${API_BASE}/users/${encodeURIComponent(username)}`);
       if (res.ok) {
-        profileData = await res.json();
+        profileData = await safeJson(res);
       }
     } catch (e) {
       console.warn('[API] Backend user profile fetch error', e);
@@ -211,8 +225,8 @@ export const api = {
   },
 
   async toggleFollow(userId: string): Promise<{ success: boolean; isFollowing: boolean; followersCount: number }> {
-    const res = await fetch(`/api/users/${userId}/follow`, { method: 'POST' });
-    const data = await res.json();
+    const res = await fetch(`${API_BASE}/users/${userId}/follow`, { method: 'POST', headers: getAuthHeaders() });
+    const data = await safeJson(res);
     if (!res.ok) throw new Error(data.error || 'Failed to toggle follow');
     return data;
   },
@@ -238,9 +252,9 @@ export const api = {
     };
 
     try {
-      const res = await fetch(`/api/feed?${query.toString()}`);
+      const res = await fetch(`${API_BASE}/feed?${query.toString()}`);
       if (res.ok) {
-        backendResponse = await res.json();
+        backendResponse = await safeJson(res);
       }
     } catch (err) {
       console.warn('[API] Backend feed request failed, falling back to local videos', err);
@@ -286,13 +300,13 @@ export const api = {
       const local = await localVideoStorage.getLocalVideoById(id);
       if (local) return local;
     }
-    const res = await fetch(`/api/videos/${id}`);
+    const res = await fetch(`${API_BASE}/videos/${id}`);
     if (!res.ok) {
       const local = await localVideoStorage.getLocalVideoById(id);
       if (local) return local;
       throw new Error('Failed to fetch video');
     }
-    return res.json();
+    return safeJson(res);
   },
 
   async getVideoStatus(id: string): Promise<{ id: string; processingStatus: 'processing' | 'ready' | 'failed'; status: string; video: Video }> {
@@ -302,9 +316,9 @@ export const api = {
         return { id, processingStatus: 'ready', status: 'ready', video: local };
       }
     }
-    const res = await fetch(`/api/videos/${id}/status`);
+    const res = await fetch(`${API_BASE}/videos/${id}/status`);
     if (!res.ok) throw new Error('Failed to fetch video status');
-    return res.json();
+    return safeJson(res);
   },
 
   // Interactions (delegating to localVideoStorage if local video)
@@ -313,8 +327,8 @@ export const api = {
       return localVideoStorage.toggleLocalLike(videoId);
     }
     try {
-      const res = await fetch(`/api/videos/${videoId}/like`, { method: 'POST' });
-      const data = await res.json();
+      const res = await fetch(`${API_BASE}/videos/${videoId}/like`, { method: 'POST', headers: getAuthHeaders() });
+      const data = await safeJson(res);
       if (!res.ok) throw new Error(data.error || 'Failed to toggle like');
       return data;
     } catch {
@@ -327,8 +341,8 @@ export const api = {
       return localVideoStorage.toggleLocalSave(videoId);
     }
     try {
-      const res = await fetch(`/api/videos/${videoId}/save`, { method: 'POST' });
-      const data = await res.json();
+      const res = await fetch(`${API_BASE}/videos/${videoId}/save`, { method: 'POST', headers: getAuthHeaders() });
+      const data = await safeJson(res);
       if (!res.ok) throw new Error(data.error || 'Failed to toggle save');
       return data;
     } catch {
@@ -341,9 +355,9 @@ export const api = {
       return localVideoStorage.recordLocalShare(videoId);
     }
     try {
-      const res = await fetch(`/api/videos/${videoId}/share`, { method: 'POST' });
+      const res = await fetch(`${API_BASE}/videos/${videoId}/share`, { method: 'POST', headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to record share');
-      return res.json();
+      return safeJson(res);
     } catch {
       return localVideoStorage.recordLocalShare(videoId);
     }
@@ -358,13 +372,13 @@ export const api = {
       return { success: true, viewsCount: res.viewsCount, counted: true };
     }
     try {
-      const res = await fetch(`/api/videos/${videoId}/view`, {
+      const res = await fetch(`${API_BASE}/videos/${videoId}/view`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload || {}),
       });
       if (!res.ok) throw new Error('Failed to record view');
-      return res.json();
+      return safeJson(res);
     } catch {
       return localVideoStorage.recordLocalView(videoId);
     }
@@ -377,9 +391,9 @@ export const api = {
       return localComments;
     }
     try {
-      const res = await fetch(`/api/videos/${videoId}/comments`);
+      const res = await fetch(`${API_BASE}/videos/${videoId}/comments`);
       if (!res.ok) return localComments;
-      const serverComments: Comment[] = await res.json();
+      const serverComments: Comment[] = await safeJson(res);
       const localIds = new Set(localComments.map((c) => c.id));
       return [...localComments, ...serverComments.filter((c) => !localIds.has(c.id))];
     } catch {
@@ -409,12 +423,12 @@ export const api = {
       return localVideoStorage.addLocalComment(videoId, text, author);
     }
 
-    const res = await fetch(`/api/videos/${videoId}/comments`, {
+    const res = await fetch(`${API_BASE}/videos/${videoId}/comments`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ text }),
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok) throw new Error(data.error || 'Failed to add comment');
     return data;
   },
@@ -441,13 +455,13 @@ export const api = {
 
     // Try posting to backend database
     try {
-      const res = await fetch('/api/videos/upload', {
+      const res = await fetch(`${API_BASE}/videos/upload`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
       if (res.ok) {
-        const data = await res.json();
+        const data = await safeJson(res);
         if (data.success && data.video) {
           videoResult = data.video;
         }
@@ -525,22 +539,22 @@ export const api = {
 
   // Notifications
   async getNotifications(): Promise<{ notifications: NotificationItem[]; unreadCount: number }> {
-    const res = await fetch('/api/notifications');
+    const res = await fetch(`${API_BASE}/notifications`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Failed to fetch notifications');
-    return res.json();
+    return safeJson(res);
   },
 
   async markAllNotificationsRead(): Promise<{ success: boolean }> {
-    const res = await fetch('/api/notifications/read-all', { method: 'POST' });
+    const res = await fetch(`${API_BASE}/notifications/read-all`, { method: 'POST', headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Failed to mark read');
-    return res.json();
+    return safeJson(res);
   },
 
   // Messages
   async getMessages(): Promise<{ conversations: MessageConversation[] }> {
-    const res = await fetch('/api/messages');
+    const res = await fetch(`${API_BASE}/messages`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Failed to fetch messages');
-    return res.json();
+    return safeJson(res);
   },
 
   // Search
@@ -550,34 +564,34 @@ export const api = {
     sounds: Sound[];
     hashtags: string[];
   }> {
-    const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+    const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(query)}`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Search failed');
-    return res.json();
+    return safeJson(res);
   },
 
   // Sounds
   async getSounds(): Promise<Sound[]> {
-    const res = await fetch('/api/sounds');
+    const res = await fetch(`${API_BASE}/sounds`);
     if (!res.ok) throw new Error('Failed to fetch sounds');
-    return res.json();
+    return safeJson(res);
   },
 
   // Reporting & Moderation
   async reportVideo(payload: { videoId: string; reason: string; details?: string }): Promise<{ success: boolean }> {
-    const res = await fetch('/api/reports', {
+    const res = await fetch(`${API_BASE}/reports`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error('Failed to submit report');
-    return res.json();
+    return safeJson(res);
   },
 
   // Creator Analytics
   async getCreatorAnalytics(): Promise<CreatorAnalytics> {
-    const res = await fetch('/api/creator/analytics');
+    const res = await fetch(`${API_BASE}/creator/analytics`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Failed to fetch analytics');
-    return res.json();
+    return safeJson(res);
   },
 
   // Creator Studio Dashboard (Phase 6)
@@ -591,30 +605,31 @@ export const api = {
     if (startDate) params.set('startDate', startDate);
     if (endDate) params.set('endDate', endDate);
 
-    const res = await fetch(`/api/creator/dashboard?${params.toString()}`);
+    const res = await fetch(`${API_BASE}/creator/dashboard?${params.toString()}`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Failed to fetch creator dashboard');
-    return res.json();
+    return safeJson(res);
   },
 
   async updateCreatorVideo(
     videoId: string,
     payload: { title?: string; caption?: string; privacy?: 'public' | 'followers' | 'private' }
   ): Promise<{ success: boolean; video: Video }> {
-    const res = await fetch(`/api/creator/videos/${videoId}`, {
+    const res = await fetch(`${API_BASE}/creator/videos/${videoId}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok) throw new Error(data.error || 'Failed to update video');
     return data;
   },
 
   async deleteCreatorVideo(videoId: string): Promise<{ success: boolean; deletedId: string }> {
-    const res = await fetch(`/api/creator/videos/${videoId}`, {
+    const res = await fetch(`${API_BASE}/creator/videos/${videoId}`, {
       method: 'DELETE',
+      headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok) throw new Error(data.error || 'Failed to delete video');
     return data;
   },
@@ -623,26 +638,26 @@ export const api = {
   // PHASE 7: REAL-TIME MESSAGING API METHODS
   // ==========================================
   async getConversations(): Promise<{ conversations: MessageConversation[]; totalUnread: number }> {
-    const res = await fetch('/api/messages', {
+    const res = await fetch(`${API_BASE}/messages`, {
       headers: getAuthHeaders(),
     });
     if (!res.ok) throw new Error('Failed to fetch conversations');
-    return res.json();
+    return safeJson(res);
   },
 
   async getUnreadMessagesCount(): Promise<{ unreadCount: number }> {
-    const res = await fetch('/api/messages/unread-count', {
+    const res = await fetch(`${API_BASE}/messages/unread-count`, {
       headers: getAuthHeaders(),
     });
     if (!res.ok) return { unreadCount: 0 };
-    return res.json();
+    return safeJson(res);
   },
 
   async getConversation(conversationId: string): Promise<{ conversation: MessageConversation }> {
-    const res = await fetch(`/api/messages/${conversationId}`, {
+    const res = await fetch(`${API_BASE}/messages/${conversationId}`, {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok) throw new Error(data.error || 'Failed to fetch conversation');
     return data;
   },
@@ -656,12 +671,12 @@ export const api = {
       sharedUserId?: string;
     }
   ): Promise<{ message: ChatMessage; conversation: MessageConversation }> {
-    const res = await fetch(`/api/messages/${conversationId}`, {
+    const res = await fetch(`${API_BASE}/messages/${conversationId}`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok) throw new Error(data.error || 'Failed to send message');
     return data;
   },
@@ -672,23 +687,23 @@ export const api = {
     sharedVideoId?: string;
     sharedUserId?: string;
   }): Promise<{ conversation: MessageConversation }> {
-    const res = await fetch('/api/messages/start', {
+    const res = await fetch(`${API_BASE}/messages/start`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok) throw new Error(data.error || 'Failed to start conversation');
     return data;
   },
 
   async markConversationAsRead(conversationId: string): Promise<{ success: boolean; updatedCount: number }> {
-    const res = await fetch(`/api/messages/${conversationId}/read`, {
+    const res = await fetch(`${API_BASE}/messages/${conversationId}/read`, {
       method: 'POST',
       headers: getAuthHeaders(),
     });
     if (!res.ok) throw new Error('Failed to mark conversation as read');
-    return res.json();
+    return safeJson(res);
   },
 
   async toggleMessageReaction(
@@ -696,52 +711,52 @@ export const api = {
     messageId: string,
     emoji: string
   ): Promise<{ success: boolean; reactions: MessageReactionMap }> {
-    const res = await fetch(`/api/messages/${conversationId}/reaction`, {
+    const res = await fetch(`${API_BASE}/messages/${conversationId}/reaction`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ messageId, emoji }),
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok) throw new Error(data.error || 'Failed to update reaction');
     return data;
   },
 
   async sendTypingStatus(conversationId: string, isTyping: boolean): Promise<{ success: boolean }> {
-    const res = await fetch(`/api/messages/${conversationId}/typing`, {
+    const res = await fetch(`${API_BASE}/messages/${conversationId}/typing`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ isTyping }),
     });
     if (!res.ok) return { success: false };
-    return res.json();
+    return safeJson(res);
   },
 
   async blockUser(userId: string): Promise<{ success: boolean; isBlocked: boolean }> {
-    const res = await fetch(`/api/users/${userId}/block`, {
+    const res = await fetch(`${API_BASE}/users/${userId}/block`, {
       method: 'POST',
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok) throw new Error(data.error || 'Failed to block user');
     return data;
   },
 
   async unblockUser(userId: string): Promise<{ success: boolean; isBlocked: boolean }> {
-    const res = await fetch(`/api/users/${userId}/unblock`, {
+    const res = await fetch(`${API_BASE}/users/${userId}/unblock`, {
       method: 'POST',
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok) throw new Error(data.error || 'Failed to unblock user');
     return data;
   },
 
   async getBlockedUsers(): Promise<{ blockedUsers: BlockedUserItem[] }> {
-    const res = await fetch('/api/users/blocked', {
+    const res = await fetch(`${API_BASE}/users/blocked`, {
       headers: getAuthHeaders(),
     });
     if (!res.ok) throw new Error('Failed to fetch blocked users');
-    return res.json();
+    return safeJson(res);
   },
 
   async searchUsers(query?: string): Promise<User[]> {
@@ -759,12 +774,12 @@ export const api = {
     reason: string;
     details?: string;
   }): Promise<{ success: boolean; message: string }> {
-    const res = await fetch('/api/messages/report', {
+    const res = await fetch(`${API_BASE}/messages/report`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok) throw new Error(data.error || 'Failed to submit report');
     return data;
   },
