@@ -39,46 +39,6 @@ interface UploadModalProps {
   onUploadSuccess: (video: Video) => void;
 }
 
-const SAMPLE_PRESETS = [
-  {
-    name: 'Cyberpunk Neon Alley',
-    videoUrl: '/videos/cyberpunk_tokyo.mp4',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800',
-    caption: 'Tokyo rain reflections and neon light trails ⚡ #cyberpunk #tokyo #cinematic',
-    soundId: 's-2',
-    duration: 14,
-    fileSize: 1500000,
-    dimensions: { width: 720, height: 1280 },
-  },
-  {
-    name: 'Venice Beach Skate Pop',
-    videoUrl: '/videos/venice_skate.mp4',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1520045892732-304bc3ac5d8e?w=800',
-    caption: 'Sunset pop over the double stairs 🛹 Keep rolling! #skate #summer #vibes',
-    soundId: 's-3',
-    duration: 14,
-    fileSize: 1600000,
-    dimensions: { width: 720, height: 1280 },
-  },
-  {
-    name: 'Ocean Waves Dusk',
-    videoUrl: '/videos/coastal_waves.mp4',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800',
-    caption: 'Evening tides washing over the shore. Sound on for pure relaxation 🌊 #ocean #nature #chill',
-    soundId: 's-1',
-    duration: 14,
-    fileSize: 1600000,
-    dimensions: { width: 720, height: 1280 },
-  },
-];
-
-const COVER_OPTIONS = [
-  'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800',
-  'https://images.unsplash.com/photo-1520045892732-304bc3ac5d8e?w=800',
-  'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=800',
-  'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800',
-];
-
 const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB limit
 const ALLOWED_MIME_TYPES = [
   'video/mp4',
@@ -95,7 +55,7 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess }: UploadModalPro
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [videoSource, setVideoSource] = useState<string>('');
-  const [thumbnailSource, setThumbnailSource] = useState<string>(COVER_OPTIONS[0]);
+  const [thumbnailSource, setThumbnailSource] = useState<string>('');
   const [videoDuration, setVideoDuration] = useState<number>(15);
   const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: number }>({ width: 720, height: 1280 });
   const [fileSizeBytes, setFileSizeBytes] = useState<number>(4500000);
@@ -373,7 +333,7 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess }: UploadModalPro
         }
       } catch (err) {
         console.warn('Canvas thumbnail extraction fallback', err);
-        setThumbnailSource(COVER_OPTIONS[0]);
+        setThumbnailSource('');
       } finally {
         setIsExtractingThumb(false);
       }
@@ -422,31 +382,6 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess }: UploadModalPro
     }
   };
 
-  const handleSelectPreset = (preset: (typeof SAMPLE_PRESETS)[0]) => {
-    setValidationError(null);
-    setCancelledMessage(null);
-    setSelectedFile(null);
-    setRecordedBlob(null);
-    setVideoSource(preset.videoUrl);
-    setThumbnailSource(preset.thumbnailUrl);
-    setCaption(preset.caption);
-    setTitle(preset.name);
-    setSoundId(preset.soundId);
-    setVideoDuration(preset.duration);
-    setVideoDimensions(preset.dimensions);
-    setFileSizeBytes(preset.fileSize);
-    setExtractedFrames([preset.thumbnailUrl, ...COVER_OPTIONS.slice(0, 3)]);
-  };
-
-  const addTag = (tag: string) => {
-    setCaption((prev) => (prev.includes(tag) ? prev : `${prev.trim()} ${tag} `));
-  };
-
-  const addMention = (mention: string) => {
-    setCaption((prev) => (prev.includes(mention) ? prev : `${prev.trim()} ${mention} `));
-  };
-
-  // Real Upload Simulation with Cancellation
   const handleCancelUpload = () => {
     uploadAbortRef.current = true;
     if (uploadTimerRef.current) {
@@ -958,30 +893,6 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess }: UploadModalPro
                         className="hidden"
                       />
                     </div>
-
-                    {/* Quick Presets */}
-                    <div>
-                      <p className="text-xs font-semibold text-slate-400 mb-2 flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-cyan-400" /> Or pick a sample vibe:
-                      </p>
-                      <div className="space-y-1.5">
-                        {SAMPLE_PRESETS.map((p) => (
-                          <button
-                            key={p.name}
-                            type="button"
-                            onClick={() => handleSelectPreset(p)}
-                            className="w-full p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-left flex items-center gap-2.5 text-xs text-slate-200 transition-colors cursor-pointer"
-                          >
-                            <img
-                              src={p.thumbnailUrl}
-                              alt={p.name}
-                              className="w-8 h-8 rounded-lg object-cover"
-                            />
-                            <span className="font-medium truncate">{p.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
                   </div>
                 )}
               </div>
@@ -1001,30 +912,6 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess }: UploadModalPro
                     maxLength={300}
                     className="w-full bg-slate-900/90 border border-white/15 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
                   />
-
-                  {/* Tag and Mention quick buttons */}
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {['#afrobeats', '#amapiano', '#lagosvibes', '#jollof', '#skate', '#hy'].map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => addTag(t)}
-                        className="px-2 py-0.5 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-cyan-300 font-medium cursor-pointer"
-                      >
-                        {t}
-                      </button>
-                    ))}
-                    {['@amaka_steps', '@tunde_soundz', '@kemi_delights'].map((m) => (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => addMention(m)}
-                        className="px-2 py-0.5 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-indigo-300 font-medium cursor-pointer"
-                      >
-                        {m}
-                      </button>
-                    ))}
-                  </div>
                 </div>
 
                 {/* Cover Selection */}
@@ -1054,25 +941,7 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess }: UploadModalPro
                             )}
                           </button>
                         ))
-                      : COVER_OPTIONS.map((c, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => setThumbnailSource(c)}
-                            className={`relative rounded-lg overflow-hidden aspect-[9/13] border-2 transition-all cursor-pointer ${
-                              thumbnailSource === c
-                                ? 'border-cyan-400 scale-102 shadow-md shadow-cyan-500/20'
-                                : 'border-white/10 opacity-60 hover:opacity-100'
-                            }`}
-                          >
-                            <img src={c} alt="Cover preview" className="w-full h-full object-cover" />
-                            {thumbnailSource === c && (
-                              <div className="absolute inset-0 bg-cyan-500/20 flex items-center justify-center">
-                                <CheckCircle2 className="w-4 h-4 text-white drop-shadow" />
-                              </div>
-                            )}
-                          </button>
-                        ))}
+                      : null}
                   </div>
                 </div>
 
@@ -1094,12 +963,7 @@ export function UploadModal({ isOpen, onClose, onUploadSuccess }: UploadModalPro
                         </option>
                       ))
                     ) : (
-                      <>
-                        <option value="s-1">Midnight Echoes (Slowed + Reverb)</option>
-                        <option value="s-2">Tokyo Neon Velocity (Original Audio)</option>
-                        <option value="s-3">Venice Golden Hour Groove</option>
-                        <option value="s-4">Fluid Rhythm 120BPM</option>
-                      </>
+                      <option value="">No sounds available</option>
                     )}
                   </select>
                 </div>

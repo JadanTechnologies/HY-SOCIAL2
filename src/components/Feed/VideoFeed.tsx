@@ -76,6 +76,14 @@ export function VideoFeed({
     fetchFeed(null);
   }, [feedType, initialTag]);
 
+  useEffect(() => {
+    const handleFeedUpdated = () => {
+      fetchFeed(null).catch(console.error);
+    };
+    window.addEventListener('hy-feed-updated', handleFeedUpdated);
+    return () => window.removeEventListener('hy-feed-updated', handleFeedUpdated);
+  }, [feedType, initialTag]);
+
   // Infinite scroll trigger when nearing end of feed
   const loadMoreIfNeeded = useCallback((index: number) => {
     if (index >= videos.length - 2 && hasMore && !isLoadingMore && nextCursor) {

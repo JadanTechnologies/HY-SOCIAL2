@@ -55,7 +55,7 @@ export function CommentsDrawer({
         id: 'anon',
         username: 'guest',
         displayName: 'Guest',
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100',
+        avatar: '',
         bio: '',
         verified: false,
         followersCount: 0,
@@ -186,7 +186,7 @@ export function CommentsDrawer({
           className="p-4 border-t border-white/10 bg-[#0d1117] flex items-center gap-3"
         >
           <img
-            src={currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
+            src={currentUser?.avatar || ''}
             alt="Current user"
             className="w-8 h-8 rounded-full object-cover border border-white/10 shrink-0"
           />

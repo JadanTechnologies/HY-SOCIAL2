@@ -68,7 +68,7 @@ export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
           {/* Avatar Preview */}
           <div className="flex items-center gap-4 pb-2">
             <img
-              src={avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200'}
+              src={avatar || ''}
               alt="Avatar preview"
               className="w-16 h-16 rounded-full object-cover border-2 border-cyan-400/60 shrink-0"
             />

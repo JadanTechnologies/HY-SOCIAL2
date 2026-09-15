@@ -43,7 +43,7 @@ export function ProfileView({
   onOpenStudio,
   onOpenMessagesWithUser,
 }: ProfileViewProps) {
-  const targetUsername = username || currentUser?.username || 'tobi_bakare';
+  const targetUsername = username || currentUser?.username || '';
   const isOwnProfile = currentUser?.username.toLowerCase() === targetUsername.toLowerCase();
 
   const [profileUser, setProfileUser] = useState<UserType | null>(null);

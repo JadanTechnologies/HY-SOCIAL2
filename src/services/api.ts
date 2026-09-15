@@ -4,6 +4,21 @@ import { localStorageDB } from './localStorageDB';
 
 const STORAGE_KEY_AUTH = 'vibetok_auth_session';
 
+async function getAllStoredVideos(): Promise<Video[]> {
+  const [databaseVideos, uploadedVideos] = await Promise.all([
+    Promise.resolve(localStorageDB.getVideos()),
+    localVideoStorage.getLocalVideos(),
+  ]);
+
+  const videosById = new Map<string, Video>();
+  databaseVideos.forEach((video) => videosById.set(video.id, video));
+  uploadedVideos.forEach((video) => videosById.set(video.id, video));
+
+  return Array.from(videosById.values()).sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}
+
 export const api = {
   async getMe(): Promise<{ user: User | null; authenticated: boolean }> {
     const currentUserId = localStorageDB.getCurrentUserId();
@@ -36,20 +51,14 @@ export const api = {
       throw new Error('An account with this email already exists');
     }
 
-    const defaultAvatars = [
-      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=400&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80',
-    ];
     const newUser: User & { password?: string } = {
       id: `u-${Date.now()}`,
       email: cleanEmail,
       username: cleanUsername,
       displayName: payload.displayName?.trim() || cleanUsername,
       password: payload.password,
-      avatar: defaultAvatars[existingUsers.length % defaultAvatars.length],
-      bio: 'Creator on HY 🇳🇬✨',
+      avatar: '',
+      bio: '',
       verified: false,
       followersCount: 0,
       followingCount: 0,
@@ -157,6 +166,17 @@ export const api = {
     const allVideos = localStorageDB.getVideos();
     const userVideos = allVideos.filter((v) => v.authorId === user.id);
 
+    // Merge with locally uploaded videos (IndexedDB)
+    try {
+      const localVideos = await localVideoStorage.getLocalVideos();
+      const userLocals = localVideos.filter((v) => v.authorId === user.id);
+      if (userLocals.length > 0) {
+        const existingIds = new Set(userLocals.map((v) => v.id));
+        const rest = userVideos.filter((v) => !existingIds.has(v.id));
+        return { user, videos: [...userLocals, ...rest] };
+      }
+    } catch {}
+
     return { user, videos: userVideos };
   },
 
@@ -170,7 +190,56 @@ export const api = {
     cursor?: string | null,
     limit?: number
   ): Promise<FeedResponse> {
-    return localStorageDB.getFeed(type, tag, cursor, limit || 20);
+    const pageSize = Math.min(20, Math.max(1, limit || 20));
+    const videos = await getAllStoredVideos();
+    let filtered = videos.filter((video) => !video.isTakenDown);
+    const currentUserId = localStorageDB.getCurrentUserId();
+
+    if (tag) {
+      const cleanTag = tag.replace('#', '').toLowerCase();
+      filtered = filtered.filter((video) =>
+        video.hashtags.some((hashtag) => hashtag.toLowerCase() === cleanTag)
+      );
+    } else if (type === 'following') {
+      const following = localStorageDB.getFollowing();
+      filtered = filtered.filter((video) => following.includes(video.authorId));
+    } else if (type === 'trending') {
+      filtered = [...filtered].sort(
+        (a, b) =>
+          b.likesCount + b.sharesCount * 2 - (a.likesCount + a.sharesCount * 2)
+      );
+    } else {
+      filtered = [...filtered].sort((a, b) => {
+        const followedBoost = (video: Video) =>
+          currentUserId && video.authorId !== currentUserId
+            ? localStorageDB.getFollowing().includes(video.authorId)
+              ? 1.25
+              : 1
+            : 1;
+        const engagementA =
+          ((a.likesCount + a.savesCount * 2) / Math.max(1, a.viewsCount)) *
+          followedBoost(a);
+        const engagementB =
+          ((b.likesCount + b.savesCount * 2) / Math.max(1, b.viewsCount)) *
+          followedBoost(b);
+        return engagementB - engagementA;
+      });
+    }
+
+    let startIndex = 0;
+    if (cursor) {
+      const cursorIndex = filtered.findIndex((video) => video.id === cursor);
+      if (cursorIndex !== -1) startIndex = cursorIndex + 1;
+    }
+
+    const page = filtered.slice(startIndex, startIndex + pageSize);
+    const hasMore = startIndex + pageSize < filtered.length;
+    return {
+      videos: page,
+      nextCursor: hasMore && page.length > 0 ? page[page.length - 1].id : null,
+      hasMore,
+      total: filtered.length,
+    };
   },
 
   async getVideo(id: string): Promise<Video> {
@@ -245,19 +314,11 @@ export const api = {
 
   async addComment(videoId: string, text: string): Promise<Comment> {
     if (localVideoStorage.isLocalVideo(videoId)) {
-      return localVideoStorage.addLocalComment(videoId, text, {
-        id: 'u-jadan',
-        email: 'jadanexpress.info@gmail.com',
-        username: 'jadan',
-        displayName: 'Jabir Dangaskiya',
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80',
-        bio: 'Tech innovator, Creator & Media Producer 🚀🇳🇬 | Building the future on HY',
-        verified: true,
-        followersCount: 315000,
-        followingCount: 280,
-        likesCount: 4200000,
-        role: 'creator',
-      });
+      const currentUserId = localStorageDB.getCurrentUserId();
+      if (!currentUserId) throw new Error('Please log in to comment');
+      const author = localStorageDB.getUserById(currentUserId);
+      if (!author) throw new Error('User not found');
+      return localVideoStorage.addLocalComment(videoId, text, author);
     }
 
     const currentUserId = localStorageDB.getCurrentUserId();
@@ -304,13 +365,13 @@ export const api = {
       title: payload.title || payload.caption.slice(0, 40) || 'New Vibe',
       caption: payload.caption,
       videoUrl: payload.videoUrl,
-      thumbnailUrl: payload.thumbnailUrl || 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop&q=80',
+      thumbnailUrl: payload.thumbnailUrl || '',
       duration: payload.duration || 15,
       dimensions: payload.dimensions || { width: 720, height: 1280 },
       fileSize: payload.fileSize || 4500000,
       visibility: payload.visibility || payload.privacy || 'public',
       privacy: payload.privacy || 'public',
-      hashtags: hashtags.length > 0 ? hashtags : ['hy', 'vibes'],
+      hashtags: hashtags.length > 0 ? hashtags : [],
       sound: {
         id: payload.soundId || 's-1',
         title: 'Original Sound - HY Studio',
@@ -334,6 +395,11 @@ export const api = {
     };
 
     const storedVideo = await localVideoStorage.saveLocalVideo(newVideo, videoBlob);
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('hy-feed-updated', { detail: storedVideo }));
+    }
+
     return { success: true, video: storedVideo };
   },
 
@@ -356,7 +422,25 @@ export const api = {
     sounds: Sound[];
     hashtags: string[];
   }> {
-    return localStorageDB.search(query);
+    const databaseSearch = localStorageDB.search(query);
+    const uploadedVideos = (await getAllStoredVideos()).filter((video) => {
+      const normalizedQuery = query.toLowerCase();
+      return (
+        video.title?.toLowerCase().includes(normalizedQuery) ||
+        video.caption.toLowerCase().includes(normalizedQuery) ||
+        video.hashtags.some((hashtag) => hashtag.includes(normalizedQuery))
+      );
+    });
+    const uploadedIds = new Set(uploadedVideos.map((video) => video.id));
+    const videos = [
+      ...uploadedVideos,
+      ...databaseSearch.videos.filter((video) => !uploadedIds.has(video.id)),
+    ];
+    const hashtags = Array.from(
+      new Set([...databaseSearch.hashtags, ...videos.flatMap((video) => video.hashtags)])
+    );
+
+    return { videos, users: databaseSearch.users, sounds: databaseSearch.sounds, hashtags };
   },
 
   async getSounds(): Promise<Sound[]> {
@@ -375,7 +459,7 @@ export const api = {
   },
 
   async getCreatorAnalytics(): Promise<CreatorAnalytics> {
-    const videos = localStorageDB.getVideos();
+    const videos = await getAllStoredVideos();
     const totalViews = videos.reduce((sum, v) => sum + v.viewsCount, 0);
     const totalLikes = videos.reduce((sum, v) => sum + v.likesCount, 0);
     const totalComments = videos.reduce((sum, v) => sum + v.commentsCount, 0);
@@ -397,7 +481,7 @@ export const api = {
     _startDate?: string,
     _endDate?: string
   ): Promise<CreatorStudioDashboard> {
-    const videos = localStorageDB.getVideos();
+    const videos = await getAllStoredVideos();
     const totalViews = videos.reduce((sum, v) => sum + v.viewsCount, 0);
     const totalLikes = videos.reduce((sum, v) => sum + v.likesCount, 0);
     const totalComments = videos.reduce((sum, v) => sum + v.commentsCount, 0);
@@ -460,6 +544,11 @@ export const api = {
   },
 
   async deleteCreatorVideo(videoId: string): Promise<{ success: boolean; deletedId: string }> {
+    if (localVideoStorage.isLocalVideo(videoId)) {
+      await localVideoStorage.deleteLocalVideo(videoId);
+      return { success: true, deletedId: videoId };
+    }
+
     const videos = localStorageDB.getVideos().filter((v) => v.id !== videoId);
     localStorage.setItem('hy_videos', JSON.stringify(videos));
     return { success: true, deletedId: videoId };

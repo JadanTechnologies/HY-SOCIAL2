@@ -18,7 +18,6 @@ import { ShareModal } from './components/Share/ShareModal';
 import { ReportModal } from './components/Report/ReportModal';
 import { UploadModal } from './components/Upload/UploadModal';
 import { EditProfileModal } from './components/Profile/EditProfileModal';
-import { UserSwitcherModal } from './components/Navigation/UserSwitcherModal';
 import { AnalyticsModal } from './components/CreatorStudio/AnalyticsModal';
 import { CreatorStudioView } from './components/CreatorStudio/CreatorStudioView';
 import { AppRoute, Video } from './types';
@@ -41,7 +40,6 @@ function HYMain() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
-  const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
 
   // Video interaction drawers
@@ -217,7 +215,6 @@ function HYMain() {
           <SettingsView
             onOpenEditProfile={() => setIsEditProfileOpen(true)}
             onOpenForgotPassword={() => setIsForgotPasswordOpen(true)}
-            onOpenUserSwitcher={() => setIsUserSwitcherOpen(true)}
             onOpenStudio={() => setActiveRoute('studio')}
           />
         )}
@@ -325,17 +322,7 @@ function HYMain() {
         onUploadSuccess={handleUploadSuccess}
       />
 
-      {/* User Switcher Modal (Quick Testing) */}
-      <UserSwitcherModal
-        isOpen={isUserSwitcherOpen}
-        onClose={() => setIsUserSwitcherOpen(false)}
-        currentUser={currentUser}
-        onUserChanged={(u) => {
-          if (activeRoute === 'profile') {
-            setTargetProfileUsername(u.username);
-          }
-        }}
-      />
+      
 
       {/* Analytics Modal */}
       <AnalyticsModal

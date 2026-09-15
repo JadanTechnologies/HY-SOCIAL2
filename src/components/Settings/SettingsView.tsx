@@ -19,23 +19,21 @@ import { UserSettings } from '../../types';
 interface SettingsViewProps {
   onOpenEditProfile: () => void;
   onOpenForgotPassword: () => void;
-  onOpenUserSwitcher: () => void;
   onOpenStudio?: () => void;
 }
 
 export function SettingsView({
   onOpenEditProfile,
   onOpenForgotPassword,
-  onOpenUserSwitcher,
   onOpenStudio,
 }: SettingsViewProps) {
   const { currentUser, logout } = useAuth();
 
   const [settings, setSettings] = useState<UserSettings>({
     account: {
-      username: currentUser?.username || 'user',
-      email: currentUser?.email || 'user@hy.app',
-      displayName: currentUser?.displayName || 'User',
+      username: currentUser?.username || '',
+      email: currentUser?.email || '',
+      displayName: currentUser?.displayName || '',
       bio: currentUser?.bio || '',
     },
     privacy: {
@@ -290,13 +288,6 @@ export function SettingsView({
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <button
-              onClick={onOpenUserSwitcher}
-              className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-300 hover:text-white transition-colors cursor-pointer"
-            >
-              Switch Demo Account
-            </button>
-
             <button
               onClick={handleClearCache}
               className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"

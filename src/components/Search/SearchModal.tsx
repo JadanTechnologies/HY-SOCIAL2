@@ -12,7 +12,7 @@ interface SearchModalProps {
   onSelectHashtag: (tag: string) => void;
 }
 
-const DEFAULT_RECENT = ['#afrobeats', 'amapiano dance', 'amaka_steps', '#lagosvibes', 'jollof rice'];
+const DEFAULT_RECENT: string[] = [];
 
 export function SearchModal({
   isOpen,

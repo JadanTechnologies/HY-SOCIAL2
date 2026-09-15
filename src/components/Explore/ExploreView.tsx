@@ -89,7 +89,16 @@ export function ExploreView({
   };
 
   const isSearching = searchQuery.trim().length > 0;
-  const trendingTags = ['afrobeats', 'amapiano', 'lagosvibes', 'jollofrice', 'skate', 'tarkwabay', 'lekki', 'cinematic'];
+  const trendingTags: string[] = [];
+  const seenTags = new Set<string>();
+  for (const v of trendingVideos) {
+    for (const tag of v.hashtags as string[]) {
+      if (!seenTags.has(tag) && trendingTags.length < 8) {
+        seenTags.add(tag);
+        trendingTags.push(tag);
+      }
+    }
+  }
 
   return (
     <div

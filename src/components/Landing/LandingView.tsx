@@ -68,66 +68,34 @@ export function LandingView({
 
         {/* Live Preview Reel Cards */}
         <div className="mt-16 w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 max-w-5xl">
-          {/* Preview Card 1 */}
           <div
             onClick={onExplore}
-            className="group relative rounded-2xl overflow-hidden aspect-[9/14] bg-slate-900 border border-white/10 shadow-2xl cursor-pointer hover:border-cyan-400/50 transition-all hover:-translate-y-1"
+            className="group relative rounded-2xl overflow-hidden aspect-[9/14] bg-slate-900 border border-white/10 shadow-2xl cursor-pointer hover:border-cyan-400/50 transition-all hover:-translate-y-1 flex items-center justify-center"
           >
-            <img
-              src="https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=600&auto=format&fit=crop&q=80"
-              alt="Contemporary Dance"
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex flex-col justify-end p-5 text-left">
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-rose-500/80 text-white w-fit mb-2 flex items-center gap-1">
-                <Flame className="w-3 h-3" /> #amapiano
-              </span>
-              <h3 className="text-white text-sm font-bold line-clamp-2 leading-snug">
-                Lekki Amapiano footwork challenge drop with Lagos energy
-              </h3>
-              <p className="text-xs text-slate-300 mt-1 font-medium">@amaka_steps</p>
+            <div className="text-center p-6">
+              <Play className="w-12 h-12 text-cyan-400 mx-auto mb-3" />
+              <h3 className="text-white text-sm font-bold">Start Watching</h3>
+              <p className="text-xs text-slate-400 mt-1">Explore content from creators</p>
             </div>
           </div>
-
-          {/* Preview Card 2 */}
           <div
             onClick={onExplore}
-            className="group relative rounded-2xl overflow-hidden aspect-[9/14] bg-slate-900 border border-white/10 shadow-2xl cursor-pointer hover:border-cyan-400/50 transition-all hover:-translate-y-1 hidden sm:block"
+            className="group relative rounded-2xl overflow-hidden aspect-[9/14] bg-slate-900 border border-white/10 shadow-2xl cursor-pointer hover:border-cyan-400/50 transition-all hover:-translate-y-1 hidden sm:flex items-center justify-center"
           >
-            <img
-              src="https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&auto=format&fit=crop&q=80"
-              alt="Lekki Studio Session"
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex flex-col justify-end p-5 text-left">
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-cyan-500/80 text-black w-fit mb-2 flex items-center gap-1">
-                <Sparkles className="w-3 h-3" /> #afrobeats
-              </span>
-              <h3 className="text-white text-sm font-bold line-clamp-2 leading-snug">
-                Producing an Afrobeats banger live in Lekki Phase 1
-              </h3>
-              <p className="text-xs text-slate-300 mt-1 font-medium">@tunde_soundz</p>
+            <div className="text-center p-6">
+              <Sparkles className="w-12 h-12 text-indigo-400 mx-auto mb-3" />
+              <h3 className="text-white text-sm font-bold">Discover Vibes</h3>
+              <p className="text-xs text-slate-400 mt-1">Trending and fresh content</p>
             </div>
           </div>
-
-          {/* Preview Card 3 */}
           <div
             onClick={onExplore}
-            className="group relative rounded-2xl overflow-hidden aspect-[9/14] bg-slate-900 border border-white/10 shadow-2xl cursor-pointer hover:border-cyan-400/50 transition-all hover:-translate-y-1 hidden md:block"
+            className="group relative rounded-2xl overflow-hidden aspect-[9/14] bg-slate-900 border border-white/10 shadow-2xl cursor-pointer hover:border-cyan-400/50 transition-all hover:-translate-y-1 hidden md:flex items-center justify-center"
           >
-            <img
-              src="https://images.unsplash.com/photo-1520045892732-304bc3ac5d8e?w=600&auto=format&fit=crop&q=80"
-              alt="Lagos Skate Session"
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex flex-col justify-end p-5 text-left">
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-amber-500/80 text-black w-fit mb-2 flex items-center gap-1">
-                <Flame className="w-3 h-3" /> #lagos
-              </span>
-              <h3 className="text-white text-sm font-bold line-clamp-2 leading-snug">
-                Skating Marina and dodging Danfo buses in Lagos Island
-              </h3>
-              <p className="text-xs text-slate-300 mt-1 font-medium">@emeka_skates</p>
+            <div className="text-center p-6">
+              <Users className="w-12 h-12 text-rose-400 mx-auto mb-3" />
+              <h3 className="text-white text-sm font-bold">Join Creators</h3>
+              <p className="text-xs text-slate-400 mt-1">Sign up and start uploading</p>
             </div>
           </div>
         </div>

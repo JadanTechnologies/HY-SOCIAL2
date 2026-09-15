@@ -88,7 +88,7 @@ export function LoginModal({
                 type="text"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="jadan, tobi_bakare, or jadan@hy.app"
+                placeholder="Enter your username or email"
                 className="w-full bg-slate-900/90 border border-white/15 rounded-xl px-4 py-2.5 pl-10 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-400 transition-colors"
                 required
               />
