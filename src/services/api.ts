@@ -413,7 +413,7 @@ export const api = {
   },
 
   async getMessages(): Promise<{ conversations: MessageConversation[] }> {
-    return localStorageDB.getMessages();
+    return { conversations: localStorageDB.getConversations() as MessageConversation[] };
   },
 
   async search(query: string): Promise<{
@@ -555,60 +555,77 @@ export const api = {
   },
 
   async getConversations(): Promise<{ conversations: MessageConversation[]; totalUnread: number }> {
-    const res = localStorageDB.getMessages();
-    return { conversations: res.conversations, totalUnread: 0 };
+    const conversations = localStorageDB.getConversations() as MessageConversation[];
+    const currentUserId = localStorageDB.getCurrentUserId();
+    const totalUnread = conversations.reduce(
+      (sum, c) => sum + (c.unreadCount || 0),
+      0
+    );
+    return { conversations, totalUnread };
   },
 
   async getUnreadMessagesCount(): Promise<{ unreadCount: number }> {
-    return { unreadCount: 0 };
+    const conversations = localStorageDB.getConversations() as MessageConversation[];
+    const totalUnread = conversations.reduce(
+      (sum, c) => sum + (c.unreadCount || 0),
+      0
+    );
+    return { unreadCount: totalUnread };
   },
 
-  async getConversation(_conversationId: string): Promise<{ conversation: MessageConversation }> {
-    throw new Error('Not implemented');
+  async getConversation(conversationId: string): Promise<{ conversation: MessageConversation }> {
+    const conv = localStorageDB.getConversation(conversationId) as MessageConversation;
+    if (!conv) throw new Error('Conversation not found');
+    return { conversation: conv };
   },
 
   async sendMessage(
-    _conversationId: string,
-    _payload: { text?: string; type?: 'text' | 'video' | 'profile'; sharedVideoId?: string; sharedUserId?: string }
+    conversationId: string,
+    payload: { text?: string; type?: 'text' | 'video' | 'profile'; sharedVideoId?: string; sharedUserId?: string }
   ): Promise<{ message: ChatMessage; conversation: MessageConversation }> {
-    throw new Error('Not implemented');
+    const res = localStorageDB.sendMessage(conversationId, payload);
+    return { message: res.message as ChatMessage, conversation: res.conversation as MessageConversation };
   },
 
-  async startConversation(_payload: {
+  async startConversation(payload: {
     targetUserId: string;
     initialText?: string;
     sharedVideoId?: string;
     sharedUserId?: string;
   }): Promise<{ conversation: MessageConversation }> {
-    throw new Error('Not implemented');
+    const conv = localStorageDB.startConversation(payload.targetUserId, payload.initialText);
+    return { conversation: conv as MessageConversation };
   },
 
-  async markConversationAsRead(_conversationId: string): Promise<{ success: boolean; updatedCount: number }> {
-    return { success: true, updatedCount: 0 };
+  async markConversationAsRead(conversationId: string): Promise<{ success: boolean; updatedCount: number }> {
+    localStorageDB.markConversationRead(conversationId);
+    return { success: true, updatedCount: 1 };
   },
 
   async toggleMessageReaction(
-    _conversationId: string,
-    _messageId: string,
-    _emoji: string
+    conversationId: string,
+    messageId: string,
+    emoji: string
   ): Promise<{ success: boolean; reactions: MessageReactionMap }> {
-    throw new Error('Not implemented');
+    const res = localStorageDB.toggleMessageReaction(conversationId, messageId, emoji);
+    return { success: res.success, reactions: res.reactions as MessageReactionMap };
   },
 
   async sendTypingStatus(_conversationId: string, _isTyping: boolean): Promise<{ success: boolean }> {
     return { success: true };
   },
 
-  async blockUser(_userId: string): Promise<{ success: boolean; isBlocked: boolean }> {
-    return { success: true, isBlocked: true };
+  async blockUser(userId: string): Promise<{ success: boolean; isBlocked: boolean }> {
+    return localStorageDB.blockUser(userId);
   },
 
-  async unblockUser(_userId: string): Promise<{ success: boolean; isBlocked: boolean }> {
-    return { success: true, isBlocked: false };
+  async unblockUser(userId: string): Promise<{ success: boolean; isBlocked: boolean }> {
+    return localStorageDB.unblockUser(userId);
   },
 
   async getBlockedUsers(): Promise<{ blockedUsers: BlockedUserItem[] }> {
-    return { blockedUsers: [] };
+    const res = localStorageDB.getBlockedUsers();
+    return { blockedUsers: res.blockedUsers as BlockedUserItem[] };
   },
 
   async searchUsers(query?: string): Promise<User[]> {

@@ -412,13 +412,186 @@ export const localStorageDB = {
     return { videos, users, sounds, hashtags };
   },
 
-  // ---- Messages ----
-  getMessages(): { conversations: any[] } {
-    return { conversations: getFromStorage<any[]>(KEYS.MESSAGES, []) };
+// ---- Messages ----
+  getConversations(): any[] {
+    return getFromStorage<any[]>(KEYS.MESSAGES, []);
   },
 
-  saveMessages(conversations: any[]): void {
+  saveConversations(conversations: any[]): void {
     setToStorage(KEYS.MESSAGES, conversations);
+  },
+
+  getConversation(conversationId: string): any | null {
+    const conversations = this.getConversations();
+    return conversations.find((c) => c.id === conversationId) || null;
+  },
+
+  startConversation(targetUserId: string, initialText?: string): any {
+    const targetUser = this.getUserById(targetUserId);
+    if (!targetUser) throw new Error('User not found');
+    const currentUserId = this.getCurrentUserId();
+    if (!currentUserId) throw new Error('Authentication required');
+
+    const conversations = this.getConversations();
+    const existing = conversations.find(
+      (c) => c.user.id === targetUserId || c.participantIds?.includes(targetUserId)
+    );
+    if (existing) return existing;
+
+    const newConv: any = {
+      id: `conv-${Date.now()}`,
+      user: targetUser,
+      participantIds: [currentUserId, targetUserId],
+      lastMessage: initialText || '',
+      lastMessageAt: new Date().toISOString(),
+      lastSenderId: initialText ? currentUserId : undefined,
+      unreadCount: 0,
+      isOnline: false,
+      isBlockedByMe: false,
+      isBlockedByThem: false,
+      messages: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (initialText) {
+      const msg: any = {
+        id: `msg-${Date.now()}`,
+        conversationId: newConv.id,
+        senderId: currentUserId,
+        recipientId: targetUserId,
+        text: initialText,
+        sentAt: new Date().toISOString(),
+        read: false,
+        type: 'text',
+        status: 'sent',
+      };
+      newConv.messages.push(msg);
+      newConv.lastMessage = initialText;
+      newConv.lastSenderId = currentUserId;
+    }
+
+    conversations.unshift(newConv);
+    this.saveConversations(conversations);
+    return newConv;
+  },
+
+  sendMessage(conversationId: string, payload: { text?: string; type?: string; sharedVideoId?: string; sharedUserId?: string }): any {
+    const conversations = this.getConversations();
+    const idx = conversations.findIndex((c) => c.id === conversationId);
+    if (idx === -1) throw new Error('Conversation not found');
+
+    const conv = conversations[idx];
+    const currentUserId = this.getCurrentUserId();
+    if (!currentUserId) throw new Error('Authentication required');
+
+    const text = payload.text || '';
+    let messageText = text;
+    if (payload.type === 'video') {
+      const video = this.getVideo(payload.sharedVideoId || '');
+      messageText = text || `Shared a video${video ? ` by @${video.author.username}` : ''}`;
+    } else if (payload.type === 'profile') {
+      const profileUser = this.getUserById(payload.sharedUserId || '');
+      messageText = text || `Shared creator card${profileUser ? ` for @${profileUser.username}` : ''}`;
+    }
+
+    const newMsg: any = {
+      id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      conversationId,
+      senderId: currentUserId,
+      recipientId: conv.user.id,
+      text: messageText,
+      sentAt: new Date().toISOString(),
+      read: false,
+      type: payload.type || 'text',
+      status: 'sent',
+      reactions: {},
+    };
+
+    if (payload.type === 'video' && payload.sharedVideoId) {
+      newMsg.sharedVideo = this.getVideo(payload.sharedVideoId) || undefined;
+    }
+    if (payload.type === 'profile' && payload.sharedUserId) {
+      newMsg.sharedProfile = this.getUserById(payload.sharedUserId) || undefined;
+    }
+
+    conv.messages.push(newMsg);
+    conv.lastMessage = messageText;
+    conv.lastMessageAt = newMsg.sentAt;
+    conv.lastSenderId = currentUserId;
+    conv.updatedAt = newMsg.sentAt;
+
+    this.saveConversations(conversations);
+    return { message: newMsg, conversation: conv };
+  },
+
+  markConversationRead(conversationId: string): void {
+    const conversations = this.getConversations();
+    const conv = conversations.find((c) => c.id === conversationId);
+    if (!conv) return;
+    const currentUserId = this.getCurrentUserId();
+    conv.messages.forEach((m: any) => {
+      if (m.recipientId === currentUserId) {
+        m.read = true;
+        m.readAt = new Date().toISOString();
+        m.status = 'read';
+      }
+    });
+    conv.unreadCount = 0;
+    this.saveConversations(conversations);
+  },
+
+  toggleMessageReaction(conversationId: string, messageId: string, emoji: string): { success: boolean; reactions: any } {
+    const conversations = this.getConversations();
+    const conv = conversations.find((c) => c.id === conversationId);
+    if (!conv) throw new Error('Conversation not found');
+    const currentUserId = this.getCurrentUserId();
+    if (!currentUserId) throw new Error('Authentication required');
+
+    const msg = conv.messages.find((m: any) => m.id === messageId);
+    if (!msg) throw new Error('Message not found');
+
+    if (!msg.reactions) msg.reactions = {};
+    if (!msg.reactions[emoji]) msg.reactions[emoji] = [];
+
+    const userIndex = msg.reactions[emoji].indexOf(currentUserId);
+    if (userIndex !== -1) {
+      msg.reactions[emoji].splice(userIndex, 1);
+      if (msg.reactions[emoji].length === 0) delete msg.reactions[emoji];
+    } else {
+      msg.reactions[emoji].push(currentUserId);
+    }
+
+    this.saveConversations(conversations);
+    return { success: true, reactions: msg.reactions };
+  },
+
+  blockUser(userId: string): { success: boolean; isBlocked: boolean } {
+    const conversations = this.getConversations();
+    const conv = conversations.find((c) => c.user.id === userId);
+    if (conv) {
+      conv.isBlockedByMe = true;
+      this.saveConversations(conversations);
+    }
+    return { success: true, isBlocked: true };
+  },
+
+  unblockUser(userId: string): { success: boolean; isBlocked: boolean } {
+    const conversations = this.getConversations();
+    const conv = conversations.find((c) => c.user.id === userId);
+    if (conv) {
+      conv.isBlockedByMe = false;
+      this.saveConversations(conversations);
+    }
+    return { success: true, isBlocked: false };
+  },
+
+  getBlockedUsers(): { blockedUsers: any[] } {
+    const conversations = this.getConversations();
+    const blocked = conversations
+      .filter((c) => c.isBlockedByMe)
+      .map((c) => ({ id: c.user.id, user: c.user, blockedAt: c.updatedAt || new Date().toISOString() }));
+    return { blockedUsers: blocked };
   },
 
   // ---- Reports ----
